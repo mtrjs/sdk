@@ -1,4 +1,4 @@
-import { generateRandom } from '@fe/common/lib/random';
+import { generateRandom } from '@tubit/common/lib/random';
 import pkg from '../package.json';
 
 interface Config {

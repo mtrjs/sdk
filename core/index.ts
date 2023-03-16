@@ -1,4 +1,4 @@
-import { EventEmitter } from '@fe/common/lib/events';
+import { EventEmitter } from '@tubit/common/lib/events';
 import { Builder } from './builder';
 import { Schedule } from './schedule';
 import { Browser } from '../plugins/browser';
