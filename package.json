@@ -21,31 +21,20 @@
   },
   "homepage": "https://github.com/xjq7/monitor#readme",
   "devDependencies": {
-    "@koa/router": "^12.0.0",
     "@rollup/plugin-json": "^6.0.0",
     "@rollup/plugin-node-resolve": "^15.0.1",
     "@rollup/plugin-terser": "^0.4.0",
     "@rollup/plugin-typescript": "^11.0.0",
-    "@types/koa": "^2.13.5",
-    "@types/koa-router": "^7.4.4",
-    "@types/koa-static": "^4.0.2",
-    "@types/koa__router": "^12.0.0",
-    "@types/node": "^18.15.0",
+    "@types/node": "^18.14.2",
     "cross-env": "^7.0.3",
-    "ejs": "^3.1.9",
-    "koa": "^2.14.1",
-    "koa-router": "^12.0.0",
-    "koa-static": "^5.0.0",
-    "koa-views": "^8.0.0",
-    "nodemon": "^2.0.21",
     "prettier": "^2.8.4",
-    "rimraf": "^4.4.0",
-    "rollup": "^3.19.1",
+    "rimraf": "^4.1.2",
+    "rollup": "^3.17.3",
     "rollup-plugin-clear": "^2.0.7",
     "tslib": "^2.5.0",
     "typescript": "^4.9.5"
   },
   "dependencies": {
-    "@fe/common": "5.4.1-beta.3"
+    "@tubit/common": "^1.5.1"
   }
 }
