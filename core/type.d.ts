@@ -13,6 +13,8 @@ interface IBaseData {
   sdk: {
     version: string;
   };
+  // 时间戳
+  t?: number
 }
 
 interface IPlugin {

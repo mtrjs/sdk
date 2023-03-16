@@ -85,6 +85,12 @@ export class Browser {
     instance.$hook.on('send', (report) => {
       report(this.send);
     });
+
+    window.addEventListener('unload',()=>{
+      instance.$hook.emit('report',{
+        
+      })
+    })
   }
 
   send(url: string, data: IData) {

@@ -7,6 +7,13 @@ interface Config {
   client: Monitor;
 }
 
+interface Task {
+  id: number;
+  data: IData;
+}
+
+let id = 0;
+
 /**
  * 任务中心
  *
@@ -14,7 +21,7 @@ interface Config {
  * @class Schedule
  */
 export class Schedule {
-  private tasks: IData[];
+  private tasks: Task[];
   private max: number;
   private client: Monitor;
   private pending: boolean = false;
@@ -25,15 +32,16 @@ export class Schedule {
     this.max = config.max || 10;
   }
 
+  // 消费任务
   consumer() {
     if (this.tasks.length < this.max || this.pending) return;
     this.pending = true;
     this.client.$hook.emit('send', (send: Send) => {
-      const data = this.tasks.slice(0, this.max);
-      console.log('send 任务发送: 数据', data);
-      send(serverUrl, data)
+      const datas = this.tasks.slice(0, this.max).map(({ data }) => data);
+      console.log('send 任务发送: 数据', datas);
+      send(serverUrl, datas)
         .then(() => {
-          console.log('send 成功, 清除成功任务')
+          console.log('send 成功, 清除成功任务');
           this.tasks = this.tasks.slice(this.max);
           this.consumer();
         })
@@ -43,10 +51,16 @@ export class Schedule {
     });
   }
 
+  // 储存任务
   push(data: IData) {
-    this.tasks.push(data);
+    const task = { id: ++id, data };
+    this.tasks.push(task);
     this.consumer();
   }
 
+  // 清空任务并消费
+  clear() {}
+
+  // 立即上报
   immediate(report: Function) {}
 }

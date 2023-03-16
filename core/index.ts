@@ -53,7 +53,7 @@ export default class Monitor {
     this.$hook.on('report', (data: LData) => {
       console.log('report 事件触发, 数据:', data);
       const pkgData = this.builder.build(data);
-      this.schedule.push(pkgData);
+      pkgData && this.schedule.push(pkgData);
     });
   }
 }

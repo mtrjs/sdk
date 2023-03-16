@@ -12,7 +12,7 @@ interface Config {
  * @class Builder
  */
 export class Builder {
-  private baseData: IBaseData;
+  baseData: IBaseData;
 
   constructor(config: Config) {
     const { appId } = config;
@@ -28,6 +28,6 @@ export class Builder {
 
   build(data: LData) {
     const { l, type } = data;
-    return Object.assign({ l, type }, this.baseData);
+    return Object.assign({ l, type, t: +new Date() }, this.baseData);
   }
 }
