@@ -6,17 +6,20 @@ interface Config {
 }
 
 /**
- * 数据包装器, 公共参数注入, 转换
+ * 数据处理
  *
  * @export
  * @class Builder
  */
 export class Builder {
   baseData: IBaseData;
+  cache: Map<string, string>
 
   constructor(config: Config) {
     const { appId } = config;
     const traceId = generateRandom();
+    this.cache = new Map()
+
     this.baseData = {
       appId,
       traceId,
@@ -26,8 +29,10 @@ export class Builder {
     };
   }
 
+  
+
+
   build(data: LData) {
-    const { l, type } = data;
-    return Object.assign({ l, type, t: +new Date() }, this.baseData);
+    return { t: +new Date(), ...this.baseData, ...data };
   }
 }

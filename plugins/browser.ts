@@ -1,5 +1,5 @@
 import Monitor from '../core';
-import { ReportType } from '../lib/constant';
+import { ErrorType, ReportType, RequestType } from '../lib/constant';
 
 // V2 是相对时间, V1 是时间戳
 interface IPerformanceTimingV2 {
@@ -61,104 +61,445 @@ interface IPerformanceTimingV2 {
 
 interface Options {}
 
+interface IError extends Event {
+  colno?: string;
+  filename?: string;
+  lineno?: string;
+  message?: string;
+  error?: Error;
+  name?: string;
+}
+
 /**
  * 浏览器端插件
  *
  * @export
  * @class Browser
  */
-export class Browser {
+export class Browser implements IPlugin {
   private options: Options;
   name: string = 'Browser';
+  client: Monitor | undefined;
+
   constructor(options?: Options) {
     this.options = options || {};
   }
 
-  apply(instance: Monitor) {
-    instance.$hook.on('init', () => {
-      console.log('init 事件触发')
-      this.timing(instance);
-      this.jsError(instance);
-      this.promiseError(instance);
+  apply(client: Monitor) {
+    this.client = client;
+
+    if (!window) return;
+
+    client.$hook.on('init', () => {
+      console.log('init 事件触发');
+      this.timing();
+      this.listenError();
+      this.promiseError();
+      this.overrideFetch();
+      this.overrideXHR();
     });
 
-    instance.$hook.on('send', (report) => {
+    client.$hook.on('send', (report) => {
       report(this.send);
     });
 
-    window.addEventListener('unload',()=>{
-      instance.$hook.emit('report',{
-        
-      })
-    })
+    window.addEventListener('unload', () => {
+      client.$hook.emit('report', {});
+    });
   }
 
-  send(url: string, data: IData) {
+  send(url: string, body: { data: IData[] }) {
+    const { data } = body;
+    const formData = new FormData();
+    formData.append('data', JSON.stringify(data));
     if (typeof navigator.sendBeacon === 'function') {
-      return Promise.resolve(navigator.sendBeacon(url, JSON.stringify(data)));
+      return Promise.resolve(navigator.sendBeacon(url, formData));
     } else {
+      return new Promise<boolean>((r, j) => {
+        const XHR = new XMLHttpRequest();
+        XHR.addEventListener('load', function () {
+          console.log(this);
+          r(true);
+        });
+        XHR.addEventListener('error', function () {
+          j();
+        });
+        XHR.open('POST', url);
+        XHR.send(formData);
+      });
     }
   }
+
+  report(data: { eid: string; l: Record<string, any> }) {
+    const { eid, l } = data;
+    const ua = navigator.userAgent;
+    this.client?.$hook.emit('report', {
+      eid,
+      l: {
+        ...l,
+        ua,
+      },
+    });
+  }
+
+  overrideXHR() {
+    const monitor = this.client;
+    if (!XMLHttpRequest) return;
+    const _open = XMLHttpRequest.prototype.open;
+    const _send = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (...args: any) {
+      const [method, url] = args;
+      const startTime = Date.now();
+
+      this.monitorCollect = {
+        ...this.monitorCollect,
+        method,
+        url,
+        startTime,
+        type: RequestType.XHR,
+      };
+      _open.apply(this, args);
+    };
+    XMLHttpRequest.prototype.send = function (...args) {
+      this.addEventListener('loadend', () => {
+        const endTime = Date.now();
+        const { status, statusText } = this;
+
+        if (status > 200) {
+          this.monitorCollect = {
+            ...this.monitorCollect,
+            endTime,
+            status,
+            statusText,
+          };
+
+          monitor?.$hook.emit('report', {
+            eid: '1001',
+            l: this.monitorCollect,
+          });
+        }
+      });
+
+      _send.apply(this, args);
+    };
+  }
+
+  overrideFetch() {
+    if (typeof window.fetch !== 'function') {
+      return;
+    }
+    const _this = this;
+
+    const originFetch = window.fetch;
+
+    window.fetch = (...args) => {
+      const startTime = Date.now();
+      const url = args[0];
+      const config = args[1];
+      const { method = 'GET' } = config || {};
+      const reportData: Record<string, string | number> = {
+        url: url as string,
+        startTime,
+        method,
+        type: RequestType.fetch,
+      };
+
+      return originFetch
+        .apply(window, args)
+        .then((result) => {
+          const { status, statusText } = result;
+          if (status && status > 300) {
+            const endTime = Date.now();
+            Object.assign(reportData, { status, statusText, endTime });
+            _this.report({ eid: '1001', l: reportData });
+          }
+          return result;
+        })
+        .catch((error: any) => {
+          const endTime = Date.now();
+          const { name, message, stack } = error;
+          Object.assign(reportData, { name, message, stack });
+
+          reportData.endTime = endTime;
+          _this.report({
+            eid: '1001',
+            l: reportData,
+          });
+
+          return error;
+        });
+    };
+  }
+
   /**
    * Js 异常捕捉
    *
-   * @param {Monitor} instance
+   * @param {Monitor} client
    * @memberof Browser
    */
-  jsError(instance: Monitor) {
-    window.onerror = (event: Event | string, source?: string, lineno?: number, colno?: number, error?: Error) => {
-      instance.$hook.emit('report', {
-        type: ReportType.ERROR,
-        l: {
-          source,
-          lineno,
-        },
-      });
-    };
+  listenError() {
+    window.addEventListener(
+      'error',
+      (e: IError) => {
+        let { type, error, colno, filename, lineno, message } = e;
+        console.log(e);
+        if (type === 'error' && filename && colno && lineno) {
+          if (!message) {
+            message = error?.message || '';
+          }
+
+          this.report({
+            eid: '1003',
+            l: {
+              colno,
+              message,
+              filename,
+              lineno,
+              stack: error?.stack,
+            },
+          });
+        }
+      },
+      true,
+    );
   }
   /**
    * Promise 错误捕捉
    *
-   * @param {Monitor} instance
+   * @param {Monitor} client
    * @memberof Browser
    */
-  promiseError(instance: Monitor) {
+  promiseError() {
     window.addEventListener('unhandledrejection', (e: PromiseRejectionEvent) => {
       const { reason } = e;
-      console.log(e);
+      const reportData = {
+        message: '',
+        stack: '',
+        name: '',
+      };
+
+      if (typeof reason === 'string') {
+        reportData.message = reason;
+      } else if (reason instanceof Error) {
+        const { name, stack, message } = reason;
+        reportData.message = message;
+        reportData.stack = stack || '';
+        reportData.name = name;
+      }
+      this.report({
+        eid: '1003',
+        l: {
+          type: ErrorType.PROMISE,
+          ...reportData,
+        },
+      });
     });
   }
 
   /**
    * 性能数据采集
    *
-   * @param {Monitor} instance
+   * @param {Monitor} client
    * @memberof Browser
    */
-  timing(instance: Monitor) {
+  timing() {
     let timing: IPerformanceTimingV2 = {};
     // v2
     if (!!PerformanceObserver) {
-      const perfObserver = (entries: PerformanceObserverEntryList) => {
-        entries.getEntries().forEach((entry) => {
-          const { entryType } = entry;
-          if (entryType === 'navigation') {
-            const t = entry.toJSON() as IPerformanceTimingV2;
-            Object.assign(timing, t);
-          }
-        });
-      };
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          console.log(
+            performance.getEntriesByType('navigation'),
+            performance.getEntriesByType('paint'),
+            performance.getEntriesByType('largest-contentful-paint'),
+            performance.getEntries(),
+          );
+        }, 2000);
+      });
 
-      const observer = new PerformanceObserver(perfObserver);
-      observer.observe({
-        entryTypes: ['navigation'],
+      const fcpP = new Promise<number>((r, j) => {
+        const observer = new PerformanceObserver((list) => {
+          list.getEntries().forEach((entry) => {
+            if (entry.name === 'first-contentful-paint') {
+              r(entry.startTime);
+            }
+          });
+        });
+
+        observer.observe({ type: 'paint', buffered: true });
+      });
+
+      const lcpP = new Promise<number>((r, j) => {
+        const observer = new PerformanceObserver((list) => {
+          const entries = list.getEntries();
+          const lastEntry = entries[entries.length - 1];
+          r(lastEntry.startTime);
+        });
+        observer.observe({ type: 'largest-contentful-paint', buffered: true });
+      });
+
+      const navigationP = new Promise<IPerformanceTimingV2>((r, j) => {
+        const perfObserver = (entries: PerformanceObserverEntryList) => {
+          entries.getEntries().forEach((entry) => {
+            const { entryType } = entry;
+            if (entryType === 'navigation') {
+              const t = entry.toJSON() as IPerformanceTimingV2;
+              r(t);
+            }
+          });
+        };
+        const observer = new PerformanceObserver(perfObserver);
+        observer.observe({ entryTypes: ['navigation'] });
+      });
+
+      Promise.all([navigationP, lcpP, fcpP]).then(([navigation, lcp, fcp]) => {
+        const timing = this.formatTiming(navigation);
+        this.report({
+          eid: '1000',
+          l: {
+            ...timing,
+            lcp: Number(lcp.toFixed(2)),
+            fcp: Number(fcp.toFixed(2)),
+          },
+        });
       });
     } else {
-      Object.assign(timing, performance.navigation, performance.timing);
+      window.addEventListener('load', () => {
+        let {
+          unloadEventStart,
+          unloadEventEnd,
+          navigationStart,
+          redirectStart,
+          redirectEnd,
+          fetchStart,
+          domainLookupStart,
+          domainLookupEnd,
+          connectStart,
+          secureConnectionStart,
+          connectEnd,
+          requestStart,
+          responseStart,
+          responseEnd,
+          domLoading,
+          domInteractive,
+          domContentLoadedEventEnd,
+          domContentLoadedEventStart,
+          domComplete,
+          loadEventStart,
+          loadEventEnd,
+        } = performance.timing;
+
+        const { redirectCount } = performance.navigation;
+        const startAt = navigationStart || 0;
+
+        unloadEventStart = unloadEventStart >= startAt ? unloadEventStart - startAt : 0;
+        unloadEventEnd = unloadEventEnd >= startAt ? unloadEventEnd - startAt : unloadEventStart;
+        redirectStart = redirectStart >= startAt ? redirectStart - startAt : unloadEventEnd;
+        redirectEnd = redirectEnd >= startAt ? redirectEnd - startAt : redirectStart;
+        fetchStart = fetchStart >= startAt ? fetchStart - startAt : redirectEnd;
+        domainLookupStart = domainLookupStart >= startAt ? domainLookupStart - startAt : fetchStart;
+        domainLookupEnd = domainLookupStart >= startAt ? domainLookupStart - startAt : domainLookupStart;
+        connectStart = connectStart >= startAt ? connectStart - startAt : domainLookupEnd;
+        secureConnectionStart = secureConnectionStart >= startAt ? secureConnectionStart - startAt : connectStart;
+        connectEnd = connectEnd >= startAt ? connectEnd - startAt : secureConnectionStart;
+        requestStart = requestStart ? requestStart - startAt : connectEnd;
+        responseStart = responseStart >= startAt ? responseStart - startAt : requestStart;
+        responseEnd = responseEnd >= startAt ? responseEnd - startAt : responseStart;
+        domLoading = domLoading >= startAt ? domLoading - startAt : responseEnd;
+        domInteractive = domInteractive >= startAt ? domInteractive - startAt : domLoading;
+        domContentLoadedEventStart =
+          domContentLoadedEventStart >= startAt ? domContentLoadedEventStart - startAt : domInteractive;
+        domContentLoadedEventEnd =
+          domContentLoadedEventEnd >= startAt ? domContentLoadedEventEnd - startAt : domContentLoadedEventStart;
+        domComplete = domComplete >= startAt ? domComplete - startAt : domContentLoadedEventEnd;
+        loadEventStart = loadEventStart >= startAt ? loadEventStart - startAt : domComplete;
+        loadEventEnd = loadEventEnd >= startAt ? loadEventEnd - startAt : loadEventStart;
+        timing = {
+          navigationStart: 0,
+          unloadEventStart,
+          unloadEventEnd,
+          redirectStart,
+          redirectEnd,
+          fetchStart,
+          domainLookupStart,
+          domainLookupEnd,
+          connectStart,
+          secureConnectionStart,
+          connectEnd,
+          requestStart,
+          responseStart,
+          responseEnd,
+          domLoading,
+          domInteractive,
+          domContentLoadedEventEnd,
+          domContentLoadedEventStart,
+          domComplete,
+          loadEventStart,
+          loadEventEnd,
+          redirectCount,
+        };
+        this.report({ eid: '1000', l: timing });
+      });
     }
-    instance.$hook.emit('report', {
-      type: ReportType.PERFORMANCE,
-      l: timing,
+  }
+
+  formatTiming(timing: IPerformanceTimingV2) {
+    const {
+      unloadEventStart,
+      unloadEventEnd,
+      navigationStart,
+      redirectStart,
+      redirectEnd,
+      redirectCount,
+      fetchStart,
+      domainLookupStart,
+      domainLookupEnd,
+      connectStart,
+      secureConnectionStart,
+      connectEnd,
+      requestStart,
+      responseStart,
+      responseEnd,
+      domLoading,
+      domInteractive,
+      domContentLoadedEventEnd,
+      domContentLoadedEventStart,
+      domComplete,
+      loadEventStart,
+      loadEventEnd,
+    } = timing;
+    const t = {
+      unloadEventStart,
+      unloadEventEnd,
+      navigationStart,
+      redirectStart,
+      redirectEnd,
+      redirectCount,
+      fetchStart,
+      domainLookupStart,
+      domainLookupEnd,
+      connectStart,
+      secureConnectionStart,
+      connectEnd,
+      requestStart,
+      responseStart,
+      responseEnd,
+      domLoading,
+      domInteractive,
+      domContentLoadedEventEnd,
+      domContentLoadedEventStart,
+      domComplete,
+      loadEventStart,
+      loadEventEnd,
+    };
+
+    Object.entries(t).forEach(([key, value]) => {
+      if (typeof value === 'number') {
+        t[key as keyof IPerformanceTimingV2] = Number(value.toFixed(2));
+      } else {
+        t[key as keyof IPerformanceTimingV2] = value || 0;
+      }
     });
+    return t;
   }
 }

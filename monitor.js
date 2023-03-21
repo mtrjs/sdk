@@ -243,6 +243,17 @@
     __globalEvent__ = window.__globalEvent__;
   }
 
+  var _assign = function __assign() {
+    _assign = Object.assign || function __assign(t) {
+      for (var s, i = 1, n = arguments.length; i < n; i++) {
+        s = arguments[i];
+        for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
+      }
+      return t;
+    };
+    return _assign.apply(this, arguments);
+  };
+
   /*
    * ID生成器
    *
@@ -319,7 +330,7 @@
   };
 
   /**
-   * 数据包装器, 公共参数注入, 转换
+   * 数据处理
    *
    * @export
    * @class Builder
@@ -328,6 +339,7 @@
       function Builder(config) {
           var appId = config.appId;
           var traceId = generateRandom();
+          this.cache = new Map();
           this.baseData = {
               appId: appId,
               traceId: traceId,
@@ -337,26 +349,10 @@
           };
       }
       Builder.prototype.build = function (data) {
-          var l = data.l, type = data.type;
-          return Object.assign({ l: l, type: type, t: +new Date() }, this.baseData);
+          return _assign(_assign({ t: +new Date() }, this.baseData), data);
       };
       return Builder;
   }());
-
-  // 上报服务端地址
-  var serverUrl = '';
-  /**
-   * 上报类型
-   *
-   * @export
-   * @enum {number}
-   */
-  var ReportType;
-  (function (ReportType) {
-      ReportType["PERFORMANCE"] = "1";
-      ReportType["RESOURCE"] = "2";
-      ReportType["ERROR"] = "3";
-  })(ReportType || (ReportType = {}));
 
   var id = 0;
   /**
@@ -377,14 +373,15 @@
           var _this = this;
           if (this.tasks.length < this.max || this.pending)
               return;
+          var dsn = this.client.config.dsn;
           this.pending = true;
           this.client.$hook.emit('send', function (send) {
               var datas = _this.tasks.slice(0, _this.max).map(function (_a) {
                   var data = _a.data;
                   return data;
               });
-              console.log('send 任务发送: 数据', datas);
-              send(serverUrl, datas)
+              console.log('send 任务发送: 数据', { data: datas });
+              send(dsn + '/v1/report', { data: datas })
                   .then(function () {
                   console.log('send 成功, 清除成功任务');
                   _this.tasks = _this.tasks.slice(_this.max);
@@ -402,11 +399,38 @@
           this.consumer();
       };
       // 清空任务并消费
-      Schedule.prototype.clear = function () { };
+      Schedule.prototype.clear = function () {
+          this.consumer();
+      };
       // 立即上报
       Schedule.prototype.immediate = function (report) { };
       return Schedule;
   }());
+
+  // 上报服务端地址
+  /**
+   * 上报类型
+   *
+   * @export
+   * @enum {number}
+   */
+  var ReportType;
+  (function (ReportType) {
+      ReportType["PERFORMANCE"] = "1";
+      ReportType["RESOURCE"] = "2";
+      ReportType["ERROR"] = "3";
+  })(ReportType || (ReportType = {}));
+  var ErrorType;
+  (function (ErrorType) {
+      ErrorType[ErrorType["PROMISE"] = 0] = "PROMISE";
+      ErrorType[ErrorType["JS"] = 1] = "JS";
+      ErrorType[ErrorType["RESOURCE"] = 2] = "RESOURCE";
+  })(ErrorType || (ErrorType = {}));
+  var RequestType;
+  (function (RequestType) {
+      RequestType[RequestType["fetch"] = 0] = "fetch";
+      RequestType[RequestType["XHR"] = 1] = "XHR";
+  })(RequestType || (RequestType = {}));
 
   /**
    * 浏览器端插件
@@ -419,90 +443,358 @@
           this.name = 'Browser';
           this.options = options || {};
       }
-      Browser.prototype.apply = function (instance) {
-          var _this = this;
-          instance.$hook.on('init', function () {
+      Browser.prototype.apply = function (client) {
+          var _this_1 = this;
+          this.client = client;
+          if (!window)
+              return;
+          client.$hook.on('init', function () {
               console.log('init 事件触发');
-              _this.timing(instance);
-              _this.jsError(instance);
-              _this.promiseError(instance);
+              _this_1.timing();
+              _this_1.listenError();
+              _this_1.promiseError();
+              _this_1.overrideFetch();
+              _this_1.overrideXHR();
           });
-          instance.$hook.on('send', function (report) {
-              report(_this.send);
+          client.$hook.on('send', function (report) {
+              report(_this_1.send);
           });
           window.addEventListener('unload', function () {
-              instance.$hook.emit('report', {});
+              client.$hook.emit('report', {});
           });
       };
-      Browser.prototype.send = function (url, data) {
+      Browser.prototype.send = function (url, body) {
+          var data = body.data;
+          var formData = new FormData();
+          formData.append('data', JSON.stringify(data));
           if (typeof navigator.sendBeacon === 'function') {
-              return Promise.resolve(navigator.sendBeacon(url, JSON.stringify(data)));
+              return Promise.resolve(navigator.sendBeacon(url, formData));
+          }
+          else {
+              return new Promise(function (r, j) {
+                  var XHR = new XMLHttpRequest();
+                  XHR.addEventListener('load', function () {
+                      console.log(this);
+                      r(true);
+                  });
+                  XHR.addEventListener('error', function () {
+                      j();
+                  });
+                  XHR.open('POST', url);
+                  XHR.send(formData);
+              });
           }
       };
-      /**
-       * Js 异常捕捉
-       *
-       * @param {Monitor} instance
-       * @memberof Browser
-       */
-      Browser.prototype.jsError = function (instance) {
-          window.onerror = function (event, source, lineno, colno, error) {
-              instance.$hook.emit('report', {
-                  type: ReportType.ERROR,
-                  l: {
-                      source: source,
-                      lineno: lineno,
-                  },
+      Browser.prototype.report = function (data) {
+          var _a;
+          var eid = data.eid, l = data.l;
+          var ua = navigator.userAgent;
+          (_a = this.client) === null || _a === void 0 ? void 0 : _a.$hook.emit('report', {
+              eid: eid,
+              l: _assign(_assign({}, l), { ua: ua }),
+          });
+      };
+      Browser.prototype.overrideXHR = function () {
+          var monitor = this.client;
+          if (!XMLHttpRequest)
+              return;
+          var _open = XMLHttpRequest.prototype.open;
+          var _send = XMLHttpRequest.prototype.send;
+          XMLHttpRequest.prototype.open = function () {
+              var args = [];
+              for (var _i = 0; _i < arguments.length; _i++) {
+                  args[_i] = arguments[_i];
+              }
+              var method = args[0], url = args[1];
+              var startTime = Date.now();
+              this.monitorCollect = _assign(_assign({}, this.monitorCollect), { method: method, url: url, startTime: startTime, type: RequestType.XHR });
+              _open.apply(this, args);
+          };
+          XMLHttpRequest.prototype.send = function () {
+              var _this_1 = this;
+              var args = [];
+              for (var _i = 0; _i < arguments.length; _i++) {
+                  args[_i] = arguments[_i];
+              }
+              this.addEventListener('loadend', function () {
+                  var endTime = Date.now();
+                  var _a = _this_1, status = _a.status, statusText = _a.statusText;
+                  if (status > 200) {
+                      _this_1.monitorCollect = _assign(_assign({}, _this_1.monitorCollect), { endTime: endTime, status: status, statusText: statusText });
+                      monitor === null || monitor === void 0 ? void 0 : monitor.$hook.emit('report', {
+                          eid: '1001',
+                          l: _this_1.monitorCollect,
+                      });
+                  }
+              });
+              _send.apply(this, args);
+          };
+      };
+      Browser.prototype.overrideFetch = function () {
+          if (typeof window.fetch !== 'function') {
+              return;
+          }
+          var _this = this;
+          var originFetch = window.fetch;
+          window.fetch = function () {
+              var args = [];
+              for (var _i = 0; _i < arguments.length; _i++) {
+                  args[_i] = arguments[_i];
+              }
+              var startTime = Date.now();
+              var url = args[0];
+              var config = args[1];
+              var _a = (config || {}).method, method = _a === void 0 ? 'GET' : _a;
+              var reportData = {
+                  url: url,
+                  startTime: startTime,
+                  method: method,
+                  type: RequestType.fetch,
+              };
+              return originFetch
+                  .apply(window, args)
+                  .then(function (result) {
+                  var status = result.status, statusText = result.statusText;
+                  if (status && status > 300) {
+                      var endTime = Date.now();
+                      Object.assign(reportData, { status: status, statusText: statusText, endTime: endTime });
+                      _this.report({ eid: '1001', l: reportData });
+                  }
+                  return result;
+              })
+                  .catch(function (error) {
+                  var endTime = Date.now();
+                  var name = error.name, message = error.message, stack = error.stack;
+                  Object.assign(reportData, { name: name, message: message, stack: stack });
+                  reportData.endTime = endTime;
+                  _this.report({
+                      eid: '1001',
+                      l: reportData,
+                  });
+                  return error;
               });
           };
       };
       /**
-       * Promise 错误捕捉
+       * Js 异常捕捉
        *
-       * @param {Monitor} instance
+       * @param {Monitor} client
        * @memberof Browser
        */
-      Browser.prototype.promiseError = function (instance) {
-          window.addEventListener('unhandledrejection', function (e) {
-              e.reason;
+      Browser.prototype.listenError = function () {
+          var _this_1 = this;
+          window.addEventListener('error', function (e) {
+              var type = e.type, error = e.error, colno = e.colno, filename = e.filename, lineno = e.lineno, message = e.message;
               console.log(e);
+              if (type === 'error' && filename && colno && lineno) {
+                  if (!message) {
+                      message = (error === null || error === void 0 ? void 0 : error.message) || '';
+                  }
+                  _this_1.report({
+                      eid: '1003',
+                      l: {
+                          colno: colno,
+                          message: message,
+                          filename: filename,
+                          lineno: lineno,
+                          stack: error === null || error === void 0 ? void 0 : error.stack,
+                      },
+                  });
+              }
+          }, true);
+      };
+      /**
+       * Promise 错误捕捉
+       *
+       * @param {Monitor} client
+       * @memberof Browser
+       */
+      Browser.prototype.promiseError = function () {
+          var _this_1 = this;
+          window.addEventListener('unhandledrejection', function (e) {
+              var reason = e.reason;
+              var reportData = {
+                  message: '',
+                  stack: '',
+                  name: '',
+              };
+              if (typeof reason === 'string') {
+                  reportData.message = reason;
+              }
+              else if (reason instanceof Error) {
+                  var name_1 = reason.name, stack = reason.stack, message = reason.message;
+                  reportData.message = message;
+                  reportData.stack = stack || '';
+                  reportData.name = name_1;
+              }
+              _this_1.report({
+                  eid: '1003',
+                  l: _assign({ type: ErrorType.PROMISE }, reportData),
+              });
           });
       };
       /**
        * 性能数据采集
        *
-       * @param {Monitor} instance
+       * @param {Monitor} client
        * @memberof Browser
        */
-      Browser.prototype.timing = function (instance) {
+      Browser.prototype.timing = function () {
+          var _this_1 = this;
           var timing = {};
           // v2
           if (!!PerformanceObserver) {
-              var perfObserver = function (entries) {
-                  entries.getEntries().forEach(function (entry) {
-                      var entryType = entry.entryType;
-                      if (entryType === 'navigation') {
-                          var t = entry.toJSON();
-                          Object.assign(timing, t);
-                      }
+              window.addEventListener('load', function () {
+                  setTimeout(function () {
+                      console.log(performance.getEntriesByType('navigation'), performance.getEntriesByType('paint'), performance.getEntriesByType('largest-contentful-paint'), performance.getEntries());
+                  }, 2000);
+              });
+              var fcpP = new Promise(function (r, j) {
+                  var observer = new PerformanceObserver(function (list) {
+                      list.getEntries().forEach(function (entry) {
+                          if (entry.name === 'first-contentful-paint') {
+                              r(entry.startTime);
+                          }
+                      });
                   });
-              };
-              var observer = new PerformanceObserver(perfObserver);
-              observer.observe({
-                  entryTypes: ['navigation'],
+                  observer.observe({ type: 'paint', buffered: true });
+              });
+              var lcpP = new Promise(function (r, j) {
+                  var observer = new PerformanceObserver(function (list) {
+                      var entries = list.getEntries();
+                      var lastEntry = entries[entries.length - 1];
+                      r(lastEntry.startTime);
+                  });
+                  observer.observe({ type: 'largest-contentful-paint', buffered: true });
+              });
+              var navigationP = new Promise(function (r, j) {
+                  var perfObserver = function (entries) {
+                      entries.getEntries().forEach(function (entry) {
+                          var entryType = entry.entryType;
+                          if (entryType === 'navigation') {
+                              var t = entry.toJSON();
+                              r(t);
+                          }
+                      });
+                  };
+                  var observer = new PerformanceObserver(perfObserver);
+                  observer.observe({ entryTypes: ['navigation'] });
+              });
+              Promise.all([navigationP, lcpP, fcpP]).then(function (_a) {
+                  var navigation = _a[0], lcp = _a[1], fcp = _a[2];
+                  var timing = _this_1.formatTiming(navigation);
+                  _this_1.report({
+                      eid: '1000',
+                      l: _assign(_assign({}, timing), { lcp: Number(lcp.toFixed(2)), fcp: Number(fcp.toFixed(2)) }),
+                  });
               });
           }
           else {
-              Object.assign(timing, performance.navigation, performance.timing);
+              window.addEventListener('load', function () {
+                  var _a = performance.timing, unloadEventStart = _a.unloadEventStart, unloadEventEnd = _a.unloadEventEnd, navigationStart = _a.navigationStart, redirectStart = _a.redirectStart, redirectEnd = _a.redirectEnd, fetchStart = _a.fetchStart, domainLookupStart = _a.domainLookupStart, domainLookupEnd = _a.domainLookupEnd, connectStart = _a.connectStart, secureConnectionStart = _a.secureConnectionStart, connectEnd = _a.connectEnd, requestStart = _a.requestStart, responseStart = _a.responseStart, responseEnd = _a.responseEnd, domLoading = _a.domLoading, domInteractive = _a.domInteractive, domContentLoadedEventEnd = _a.domContentLoadedEventEnd, domContentLoadedEventStart = _a.domContentLoadedEventStart, domComplete = _a.domComplete, loadEventStart = _a.loadEventStart, loadEventEnd = _a.loadEventEnd;
+                  var redirectCount = performance.navigation.redirectCount;
+                  var startAt = navigationStart || 0;
+                  unloadEventStart = unloadEventStart >= startAt ? unloadEventStart - startAt : 0;
+                  unloadEventEnd = unloadEventEnd >= startAt ? unloadEventEnd - startAt : unloadEventStart;
+                  redirectStart = redirectStart >= startAt ? redirectStart - startAt : unloadEventEnd;
+                  redirectEnd = redirectEnd >= startAt ? redirectEnd - startAt : redirectStart;
+                  fetchStart = fetchStart >= startAt ? fetchStart - startAt : redirectEnd;
+                  domainLookupStart = domainLookupStart >= startAt ? domainLookupStart - startAt : fetchStart;
+                  domainLookupEnd = domainLookupStart >= startAt ? domainLookupStart - startAt : domainLookupStart;
+                  connectStart = connectStart >= startAt ? connectStart - startAt : domainLookupEnd;
+                  secureConnectionStart = secureConnectionStart >= startAt ? secureConnectionStart - startAt : connectStart;
+                  connectEnd = connectEnd >= startAt ? connectEnd - startAt : secureConnectionStart;
+                  requestStart = requestStart ? requestStart - startAt : connectEnd;
+                  responseStart = responseStart >= startAt ? responseStart - startAt : requestStart;
+                  responseEnd = responseEnd >= startAt ? responseEnd - startAt : responseStart;
+                  domLoading = domLoading >= startAt ? domLoading - startAt : responseEnd;
+                  domInteractive = domInteractive >= startAt ? domInteractive - startAt : domLoading;
+                  domContentLoadedEventStart =
+                      domContentLoadedEventStart >= startAt ? domContentLoadedEventStart - startAt : domInteractive;
+                  domContentLoadedEventEnd =
+                      domContentLoadedEventEnd >= startAt ? domContentLoadedEventEnd - startAt : domContentLoadedEventStart;
+                  domComplete = domComplete >= startAt ? domComplete - startAt : domContentLoadedEventEnd;
+                  loadEventStart = loadEventStart >= startAt ? loadEventStart - startAt : domComplete;
+                  loadEventEnd = loadEventEnd >= startAt ? loadEventEnd - startAt : loadEventStart;
+                  timing = {
+                      navigationStart: 0,
+                      unloadEventStart: unloadEventStart,
+                      unloadEventEnd: unloadEventEnd,
+                      redirectStart: redirectStart,
+                      redirectEnd: redirectEnd,
+                      fetchStart: fetchStart,
+                      domainLookupStart: domainLookupStart,
+                      domainLookupEnd: domainLookupEnd,
+                      connectStart: connectStart,
+                      secureConnectionStart: secureConnectionStart,
+                      connectEnd: connectEnd,
+                      requestStart: requestStart,
+                      responseStart: responseStart,
+                      responseEnd: responseEnd,
+                      domLoading: domLoading,
+                      domInteractive: domInteractive,
+                      domContentLoadedEventEnd: domContentLoadedEventEnd,
+                      domContentLoadedEventStart: domContentLoadedEventStart,
+                      domComplete: domComplete,
+                      loadEventStart: loadEventStart,
+                      loadEventEnd: loadEventEnd,
+                      redirectCount: redirectCount,
+                  };
+                  _this_1.report({ eid: '1000', l: timing });
+              });
           }
-          instance.$hook.emit('report', {
-              type: ReportType.PERFORMANCE,
-              l: timing,
+      };
+      Browser.prototype.formatTiming = function (timing) {
+          var unloadEventStart = timing.unloadEventStart, unloadEventEnd = timing.unloadEventEnd, navigationStart = timing.navigationStart, redirectStart = timing.redirectStart, redirectEnd = timing.redirectEnd, redirectCount = timing.redirectCount, fetchStart = timing.fetchStart, domainLookupStart = timing.domainLookupStart, domainLookupEnd = timing.domainLookupEnd, connectStart = timing.connectStart, secureConnectionStart = timing.secureConnectionStart, connectEnd = timing.connectEnd, requestStart = timing.requestStart, responseStart = timing.responseStart, responseEnd = timing.responseEnd, domLoading = timing.domLoading, domInteractive = timing.domInteractive, domContentLoadedEventEnd = timing.domContentLoadedEventEnd, domContentLoadedEventStart = timing.domContentLoadedEventStart, domComplete = timing.domComplete, loadEventStart = timing.loadEventStart, loadEventEnd = timing.loadEventEnd;
+          var t = {
+              unloadEventStart: unloadEventStart,
+              unloadEventEnd: unloadEventEnd,
+              navigationStart: navigationStart,
+              redirectStart: redirectStart,
+              redirectEnd: redirectEnd,
+              redirectCount: redirectCount,
+              fetchStart: fetchStart,
+              domainLookupStart: domainLookupStart,
+              domainLookupEnd: domainLookupEnd,
+              connectStart: connectStart,
+              secureConnectionStart: secureConnectionStart,
+              connectEnd: connectEnd,
+              requestStart: requestStart,
+              responseStart: responseStart,
+              responseEnd: responseEnd,
+              domLoading: domLoading,
+              domInteractive: domInteractive,
+              domContentLoadedEventEnd: domContentLoadedEventEnd,
+              domContentLoadedEventStart: domContentLoadedEventStart,
+              domComplete: domComplete,
+              loadEventStart: loadEventStart,
+              loadEventEnd: loadEventEnd,
+          };
+          Object.entries(t).forEach(function (_a) {
+              var key = _a[0], value = _a[1];
+              if (typeof value === 'number') {
+                  t[key] = Number(value.toFixed(2));
+              }
+              else {
+                  t[key] = value || 0;
+              }
           });
+          return t;
       };
       return Browser;
   }());
 
+  function assertConfig(config) {
+      if (!config) {
+          throw new Error('缺少 SDK 配置信息');
+      }
+      if (!config.dsn) {
+          throw new Error('缺少 SDK dns 配置信息');
+      }
+      if (!config.appId) {
+          throw new Error('缺少 appId 应用 ID');
+      }
+  }
   /**
    * Core 实例
    *
@@ -510,19 +802,23 @@
    * @class Monitor
    */
   var Monitor = /** @class */ (function () {
-      function Monitor(options) {
-          this.options = options;
-          var _a = options.plugins, plugins = _a === void 0 ? [] : _a, appId = options.appId;
-          this.$hook = new EventEmitter();
+      function Monitor() {
+      }
+      Monitor.prototype.init = function (config) {
+          var _a;
+          assertConfig(config);
+          this.config = config;
+          var _b = config.plugins, plugins = _b === void 0 ? [] : _b, appId = config.appId;
           this.builder = new Builder({ appId: appId });
-          this.schedule = new Schedule({ max: 10, client: this });
+          this.schedule = new Schedule({ max: 2, client: this });
+          this.$hook = new EventEmitter();
           // 插件注册
           this.registerPlugins(plugins);
-          // 派发事件
+          // 事件注册
           this.addListeners();
           // 唤起 init 事件
-          this.$hook.emit('init', {});
-      }
+          (_a = this.$hook) === null || _a === void 0 ? void 0 : _a.emit('init', {});
+      };
       Monitor.prototype.registerPlugins = function (plugins) {
           var _this = this;
           if (!Array.isArray(plugins))
@@ -533,11 +829,13 @@
       };
       Monitor.prototype.addListeners = function () {
           var _this = this;
+          var _a;
           // 接收插件上报事件, 将任务插入调度器
-          this.$hook.on('report', function (data) {
+          (_a = this.$hook) === null || _a === void 0 ? void 0 : _a.on('report', function (data) {
+              var _a, _b;
               console.log('report 事件触发, 数据:', data);
-              var pkgData = _this.builder.build(data);
-              pkgData && _this.schedule.push(pkgData);
+              var pkgData = (_a = _this.builder) === null || _a === void 0 ? void 0 : _a.build(data);
+              pkgData && ((_b = _this.schedule) === null || _b === void 0 ? void 0 : _b.push(pkgData));
           });
       };
       return Monitor;

@@ -1,4 +1,3 @@
-import { serverUrl } from '../lib/constant';
 import Monitor from './index';
 
 interface Config {
@@ -35,11 +34,13 @@ export class Schedule {
   // 消费任务
   consumer() {
     if (this.tasks.length < this.max || this.pending) return;
+    const { dsn } = this.client.config;
+
     this.pending = true;
     this.client.$hook.emit('send', (send: Send) => {
       const datas = this.tasks.slice(0, this.max).map(({ data }) => data);
-      console.log('send 任务发送: 数据', datas);
-      send(serverUrl, datas)
+      console.log('send 任务发送: 数据', { data: datas });
+      send(dsn + '/v1/report', { data: datas })
         .then(() => {
           console.log('send 成功, 清除成功任务');
           this.tasks = this.tasks.slice(this.max);
@@ -59,7 +60,9 @@ export class Schedule {
   }
 
   // 清空任务并消费
-  clear() {}
+  clear() {
+    this.consumer();
+  }
 
   // 立即上报
   immediate(report: Function) {}
