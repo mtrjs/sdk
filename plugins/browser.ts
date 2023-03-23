@@ -118,7 +118,6 @@ export class Browser implements IPlugin {
       return new Promise<boolean>((r, j) => {
         const XHR = new XMLHttpRequest();
         XHR.addEventListener('load', function () {
-          console.log(this);
           r(true);
         });
         XHR.addEventListener('error', function () {
@@ -242,7 +241,6 @@ export class Browser implements IPlugin {
       'error',
       (e: IError) => {
         let { type, error, colno, filename, lineno, message } = e;
-        console.log(e);
         if (type === 'error' && filename && colno && lineno) {
           if (!message) {
             message = error?.message || '';
@@ -256,6 +254,7 @@ export class Browser implements IPlugin {
               filename,
               lineno,
               stack: error?.stack,
+              type: ErrorType.JS,
             },
           });
         }
@@ -306,17 +305,6 @@ export class Browser implements IPlugin {
     let timing: IPerformanceTimingV2 = {};
     // v2
     if (!!PerformanceObserver) {
-      window.addEventListener('load', () => {
-        setTimeout(() => {
-          console.log(
-            performance.getEntriesByType('navigation'),
-            performance.getEntriesByType('paint'),
-            performance.getEntriesByType('largest-contentful-paint'),
-            performance.getEntries(),
-          );
-        }, 2000);
-      });
-
       const fcpP = new Promise<number>((r, j) => {
         const observer = new PerformanceObserver((list) => {
           list.getEntries().forEach((entry) => {

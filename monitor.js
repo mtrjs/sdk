@@ -276,8 +276,7 @@
   var main = "monitor.min.js";
   var scripts = {
   	build: "rollup -c",
-  	"build:watch": "rollup -c --watch",
-  	serve: "nodemon web/server.ts"
+  	"build:watch": "rollup -c --watch"
   };
   var repository = {
   	type: "git",
@@ -474,7 +473,6 @@
               return new Promise(function (r, j) {
                   var XHR = new XMLHttpRequest();
                   XHR.addEventListener('load', function () {
-                      console.log(this);
                       r(true);
                   });
                   XHR.addEventListener('error', function () {
@@ -585,7 +583,6 @@
           var _this_1 = this;
           window.addEventListener('error', function (e) {
               var type = e.type, error = e.error, colno = e.colno, filename = e.filename, lineno = e.lineno, message = e.message;
-              console.log(e);
               if (type === 'error' && filename && colno && lineno) {
                   if (!message) {
                       message = (error === null || error === void 0 ? void 0 : error.message) || '';
@@ -598,6 +595,7 @@
                           filename: filename,
                           lineno: lineno,
                           stack: error === null || error === void 0 ? void 0 : error.stack,
+                          type: ErrorType.JS,
                       },
                   });
               }
@@ -644,11 +642,6 @@
           var timing = {};
           // v2
           if (!!PerformanceObserver) {
-              window.addEventListener('load', function () {
-                  setTimeout(function () {
-                      console.log(performance.getEntriesByType('navigation'), performance.getEntriesByType('paint'), performance.getEntriesByType('largest-contentful-paint'), performance.getEntries());
-                  }, 2000);
-              });
               var fcpP = new Promise(function (r, j) {
                   var observer = new PerformanceObserver(function (list) {
                       list.getEntries().forEach(function (entry) {

@@ -5,8 +5,7 @@
   "main": "monitor.min.js",
   "scripts": {
     "build": "rollup -c",
-    "build:watch": "rollup -c --watch",
-    "serve": "nodemon web/server.ts"
+    "build:watch": "rollup -c --watch"
   },
   "repository": {
     "type": "git",

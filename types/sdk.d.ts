@@ -4,7 +4,7 @@ interface MonitorConfig {
   appId: string;
   dsn: string;
   plugins?: IPlugin[];
-  
+  debug?: boolean;
 }
 
 /**
