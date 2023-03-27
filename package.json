@@ -5,7 +5,8 @@
   "main": "dist/index.min.js",
   "scripts": {
     "build": "rollup -c",
-    "build:watch": "rollup -c --watch"
+    "build:watch": "rollup -c --watch",
+    "prepublish": "pnpm build"
   },
   "repository": {
     "type": "git",
