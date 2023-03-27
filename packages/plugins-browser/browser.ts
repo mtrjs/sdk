@@ -1,5 +1,5 @@
-import Monitor from '../core';
-import { ErrorType, ReportType, RequestType } from '../lib/constant';
+import { ErrorType, RequestType } from './constant';
+import { IData } from '../core/type';
 
 // V2 是相对时间, V1 是时间戳
 interface IPerformanceTimingV2 {
@@ -76,16 +76,16 @@ interface IError extends Event {
  * @export
  * @class Browser
  */
-export class Browser implements IPlugin {
+export class Browser {
   private options: Options;
   name: string = 'Browser';
-  client: Monitor | undefined;
+  client: any;
 
   constructor(options?: Options) {
     this.options = options || {};
   }
 
-  apply(client: Monitor) {
+  apply(client: any) {
     this.client = client;
 
     if (!window) return;
@@ -99,7 +99,7 @@ export class Browser implements IPlugin {
       this.overrideXHR();
     });
 
-    client.$hook.on('send', (report) => {
+    client.$hook.on('send', (report: any) => {
       report(this.send);
     });
 
@@ -150,8 +150,8 @@ export class Browser implements IPlugin {
       const [method, url] = args;
       const startTime = Date.now();
 
-      this.monitorCollect = {
-        ...this.monitorCollect,
+      this.reporterCollect = {
+        ...this.reporterCollect,
         method,
         url,
         startTime,
@@ -165,8 +165,8 @@ export class Browser implements IPlugin {
         const { status, statusText } = this;
 
         if (status > 200) {
-          this.monitorCollect = {
-            ...this.monitorCollect,
+          this.reporterCollect = {
+            ...this.reporterCollect,
             endTime,
             status,
             statusText,
@@ -174,7 +174,7 @@ export class Browser implements IPlugin {
 
           monitor?.$hook.emit('report', {
             eid: '1001',
-            l: this.monitorCollect,
+            l: this.reporterCollect,
           });
         }
       });

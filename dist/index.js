@@ -64,6 +64,154 @@
     return typeof key === "symbol" ? key : String(key);
   }
 
+  var _assign = function __assign() {
+    _assign = Object.assign || function __assign(t) {
+      for (var s, i = 1, n = arguments.length; i < n; i++) {
+        s = arguments[i];
+        for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
+      }
+      return t;
+    };
+    return _assign.apply(this, arguments);
+  };
+
+  var name = "@tubefast/core";
+  var version = "1.0.0";
+  var description = "";
+  var main = "dist/index.min.js";
+  var scripts = {
+  	build: "rollup -c",
+  	"build:watch": "rollup -c --watch"
+  };
+  var repository = {
+  	type: "git",
+  	url: "git+https://github.com/xjq7/monitor.git"
+  };
+  var keywords = [
+  ];
+  var author = "";
+  var license = "ISC";
+  var bugs = {
+  	url: "https://github.com/xjq7/monitor/issues"
+  };
+  var homepage = "https://github.com/xjq7/monitor#readme";
+  var devDependencies = {
+  	"@babel/core": "^7.21.0",
+  	"@babel/preset-env": "^7.20.2",
+  	"@babel/preset-typescript": "^7.21.0",
+  	"@rollup/plugin-babel": "^6.0.3",
+  	"@rollup/plugin-json": "^6.0.0",
+  	"@rollup/plugin-node-resolve": "^15.0.1",
+  	"@rollup/plugin-terser": "^0.4.0",
+  	"@rollup/plugin-typescript": "^11.0.0",
+  	"@types/node": "^18.14.2",
+  	"cross-env": "^7.0.3",
+  	prettier: "^2.8.4",
+  	rimraf: "^4.1.2",
+  	rollup: "^3.17.3",
+  	"rollup-plugin-clear": "^2.0.7",
+  	tslib: "^2.5.0",
+  	typescript: "^4.9.5"
+  };
+  var dependencies = {
+  	"@tubit/common": "^1.5.1",
+  	jest: "^29.4.3",
+  	"rollup-plugin-ts": "^3.2.0"
+  };
+  var pkg = {
+  	name: name,
+  	version: version,
+  	description: description,
+  	main: main,
+  	scripts: scripts,
+  	repository: repository,
+  	keywords: keywords,
+  	author: author,
+  	license: license,
+  	bugs: bugs,
+  	homepage: homepage,
+  	devDependencies: devDependencies,
+  	dependencies: dependencies
+  };
+
+  /**
+   * 数据处理
+   *
+   * @export
+   * @class Builder
+   */
+  var Builder = /** @class */ (function () {
+      function Builder(config) {
+          var appId = config.appId;
+          var traceId = 'generateRandom()';
+          this.cache = new Map();
+          this.baseData = {
+              appId: appId,
+              traceId: traceId,
+              sdk: {
+                  version: pkg.version,
+              },
+          };
+      }
+      Builder.prototype.build = function (data) {
+          return _assign(_assign({ t: +new Date() }, this.baseData), data);
+      };
+      return Builder;
+  }());
+
+  var id = 0;
+  /**
+   * 任务中心
+   *
+   * @export
+   * @class Schedule
+   */
+  var Schedule = /** @class */ (function () {
+      function Schedule(config) {
+          this.pending = false;
+          this.client = config.client;
+          this.tasks = [];
+          this.max = config.max || 10;
+      }
+      // 消费任务
+      Schedule.prototype.consumer = function () {
+          var _this = this;
+          if (this.tasks.length < this.max || this.pending)
+              return;
+          var dsn = this.client.config.dsn;
+          this.pending = true;
+          this.client.$hook.emit('send', function (send) {
+              var datas = _this.tasks.slice(0, _this.max).map(function (_a) {
+                  var data = _a.data;
+                  return data;
+              });
+              console.log('send 任务发送: 数据', { data: datas });
+              send(dsn + '/v1/report', { data: datas })
+                  .then(function () {
+                  console.log('send 成功, 清除成功任务');
+                  _this.tasks = _this.tasks.slice(_this.max);
+                  _this.consumer();
+              })
+                  .finally(function () {
+                  _this.pending = false;
+              });
+          });
+      };
+      // 储存任务
+      Schedule.prototype.push = function (data) {
+          var task = { id: ++id, data: data };
+          this.tasks.push(task);
+          this.consumer();
+      };
+      // 清空任务并消费
+      Schedule.prototype.clear = function () {
+          this.consumer();
+      };
+      // 立即上报
+      Schedule.prototype.immediate = function (report) { };
+      return Schedule;
+  }());
+
   function alias(name) {
     return function (target, _property, descriptor) {
       target[name] = descriptor.value;
@@ -243,170 +391,64 @@
     __globalEvent__ = window.__globalEvent__;
   }
 
-  var _assign = function __assign() {
-    _assign = Object.assign || function __assign(t) {
-      for (var s, i = 1, n = arguments.length; i < n; i++) {
-        s = arguments[i];
-        for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
+  function assertConfig(config) {
+      if (!config) {
+          throw new Error('缺少 SDK 配置信息');
       }
-      return t;
-    };
-    return _assign.apply(this, arguments);
-  };
-
-  /*
-   * ID生成器
-   *
-   * @Author: xiaoxianjie
-   * @Date: 2022-11-15 09:51:08
-   *
-   * Copyright © 2014-2022 Rabbitpre.com. All Rights Reserved.
-   */
-  /**
-   * 生成由数字和小写英文字母组成的随机字符串
-   * @returns 返回17~20位长度的字符串
-   */
-  function generateRandom() {
-    return Math.random().toString(36).slice(2) + new Date().getTime().toString(36);
+      if (!config.dsn) {
+          throw new Error('缺少 SDK dns 配置信息');
+      }
+      if (!config.appId) {
+          throw new Error('缺少 appId 应用 ID');
+      }
   }
-
-  var name = "monitor";
-  var version = "1.0.0";
-  var description = "";
-  var main = "monitor.min.js";
-  var scripts = {
-  	build: "rollup -c",
-  	"build:watch": "rollup -c --watch"
-  };
-  var repository = {
-  	type: "git",
-  	url: "git+https://github.com/xjq7/monitor.git"
-  };
-  var keywords = [
-  ];
-  var author = "";
-  var license = "ISC";
-  var bugs = {
-  	url: "https://github.com/xjq7/monitor/issues"
-  };
-  var homepage = "https://github.com/xjq7/monitor#readme";
-  var devDependencies = {
-  	"@babel/core": "^7.21.0",
-  	"@babel/preset-env": "^7.20.2",
-  	"@babel/preset-typescript": "^7.21.0",
-  	"@rollup/plugin-babel": "^6.0.3",
-  	"@rollup/plugin-json": "^6.0.0",
-  	"@rollup/plugin-node-resolve": "^15.0.1",
-  	"@rollup/plugin-terser": "^0.4.0",
-  	"@rollup/plugin-typescript": "^11.0.0",
-  	"@types/node": "^18.14.2",
-  	"cross-env": "^7.0.3",
-  	prettier: "^2.8.4",
-  	rimraf: "^4.1.2",
-  	rollup: "^3.17.3",
-  	"rollup-plugin-clear": "^2.0.7",
-  	tslib: "^2.5.0",
-  	typescript: "^4.9.5"
-  };
-  var dependencies = {
-  	"@tubit/common": "^1.5.1",
-  	jest: "^29.4.3"
-  };
-  var pkg = {
-  	name: name,
-  	version: version,
-  	description: description,
-  	main: main,
-  	scripts: scripts,
-  	repository: repository,
-  	keywords: keywords,
-  	author: author,
-  	license: license,
-  	bugs: bugs,
-  	homepage: homepage,
-  	devDependencies: devDependencies,
-  	dependencies: dependencies
-  };
-
   /**
-   * 数据处理
+   * Core 实例
    *
    * @export
-   * @class Builder
+   * @class Reporter
    */
-  var Builder = /** @class */ (function () {
-      function Builder(config) {
-          var appId = config.appId;
-          var traceId = generateRandom();
-          this.cache = new Map();
-          this.baseData = {
-              appId: appId,
-              traceId: traceId,
-              sdk: {
-                  version: pkg.version,
-              },
-          };
+  var Reporter = /** @class */ (function () {
+      function Reporter() {
       }
-      Builder.prototype.build = function (data) {
-          return _assign(_assign({ t: +new Date() }, this.baseData), data);
+      Reporter.prototype.init = function (config) {
+          var _a;
+          assertConfig(config);
+          this.config = config;
+          var _b = config.plugins, plugins = _b === void 0 ? [] : _b, appId = config.appId, _c = config.maxPool, maxPool = _c === void 0 ? 10 : _c;
+          this.builder = new Builder({ appId: appId });
+          this.schedule = new Schedule({ max: maxPool, client: this });
+          // @ts-ignore
+          this.$hook = new EventEmitter();
+          // 插件注册
+          this.registerPlugins(plugins);
+          // 事件注册
+          this.addListeners();
+          // 唤起 init 事件
+          (_a = this.$hook) === null || _a === void 0 ? void 0 : _a.emit('init', {});
       };
-      return Builder;
-  }());
-
-  var id = 0;
-  /**
-   * 任务中心
-   *
-   * @export
-   * @class Schedule
-   */
-  var Schedule = /** @class */ (function () {
-      function Schedule(config) {
-          this.pending = false;
-          this.client = config.client;
-          this.tasks = [];
-          this.max = config.max || 10;
-      }
-      // 消费任务
-      Schedule.prototype.consumer = function () {
+      Reporter.prototype.registerPlugins = function (plugins) {
           var _this = this;
-          if (this.tasks.length < this.max || this.pending)
+          if (!Array.isArray(plugins))
               return;
-          var dsn = this.client.config.dsn;
-          this.pending = true;
-          this.client.$hook.emit('send', function (send) {
-              var datas = _this.tasks.slice(0, _this.max).map(function (_a) {
-                  var data = _a.data;
-                  return data;
-              });
-              console.log('send 任务发送: 数据', { data: datas });
-              send(dsn + '/v1/report', { data: datas })
-                  .then(function () {
-                  console.log('send 成功, 清除成功任务');
-                  _this.tasks = _this.tasks.slice(_this.max);
-                  _this.consumer();
-              })
-                  .finally(function () {
-                  _this.pending = false;
-              });
+          plugins.map(function (plugin) {
+              return plugin.apply(_this);
           });
       };
-      // 储存任务
-      Schedule.prototype.push = function (data) {
-          var task = { id: ++id, data: data };
-          this.tasks.push(task);
-          this.consumer();
+      Reporter.prototype.addListeners = function () {
+          var _this = this;
+          var _a;
+          // 接收插件上报事件, 将任务插入调度器
+          (_a = this.$hook) === null || _a === void 0 ? void 0 : _a.on('report', function (data) {
+              var _a, _b;
+              console.log('report 事件触发, 数据:', data);
+              var pkgData = (_a = _this.builder) === null || _a === void 0 ? void 0 : _a.build(data);
+              pkgData && ((_b = _this.schedule) === null || _b === void 0 ? void 0 : _b.push(pkgData));
+          });
       };
-      // 清空任务并消费
-      Schedule.prototype.clear = function () {
-          this.consumer();
-      };
-      // 立即上报
-      Schedule.prototype.immediate = function (report) { };
-      return Schedule;
+      return Reporter;
   }());
 
-  // 上报服务端地址
   /**
    * 上报类型
    *
@@ -505,7 +547,7 @@
               }
               var method = args[0], url = args[1];
               var startTime = Date.now();
-              this.monitorCollect = _assign(_assign({}, this.monitorCollect), { method: method, url: url, startTime: startTime, type: RequestType.XHR });
+              this.reporterCollect = _assign(_assign({}, this.reporterCollect), { method: method, url: url, startTime: startTime, type: RequestType.XHR });
               _open.apply(this, args);
           };
           XMLHttpRequest.prototype.send = function () {
@@ -518,10 +560,10 @@
                   var endTime = Date.now();
                   var _a = _this_1, status = _a.status, statusText = _a.statusText;
                   if (status > 200) {
-                      _this_1.monitorCollect = _assign(_assign({}, _this_1.monitorCollect), { endTime: endTime, status: status, statusText: statusText });
+                      _this_1.reporterCollect = _assign(_assign({}, _this_1.reporterCollect), { endTime: endTime, status: status, statusText: statusText });
                       monitor === null || monitor === void 0 ? void 0 : monitor.$hook.emit('report', {
                           eid: '1001',
-                          l: _this_1.monitorCollect,
+                          l: _this_1.reporterCollect,
                       });
                   }
               });
@@ -777,65 +819,8 @@
       return Browser;
   }());
 
-  function assertConfig(config) {
-      if (!config) {
-          throw new Error('缺少 SDK 配置信息');
-      }
-      if (!config.dsn) {
-          throw new Error('缺少 SDK dns 配置信息');
-      }
-      if (!config.appId) {
-          throw new Error('缺少 appId 应用 ID');
-      }
-  }
-  /**
-   * Core 实例
-   *
-   * @export
-   * @class Monitor
-   */
-  var Monitor = /** @class */ (function () {
-      function Monitor() {
-      }
-      Monitor.prototype.init = function (config) {
-          var _a;
-          assertConfig(config);
-          this.config = config;
-          var _b = config.plugins, plugins = _b === void 0 ? [] : _b, appId = config.appId;
-          this.builder = new Builder({ appId: appId });
-          this.schedule = new Schedule({ max: 2, client: this });
-          this.$hook = new EventEmitter();
-          // 插件注册
-          this.registerPlugins(plugins);
-          // 事件注册
-          this.addListeners();
-          // 唤起 init 事件
-          (_a = this.$hook) === null || _a === void 0 ? void 0 : _a.emit('init', {});
-      };
-      Monitor.prototype.registerPlugins = function (plugins) {
-          var _this = this;
-          if (!Array.isArray(plugins))
-              return;
-          plugins.map(function (plugin) {
-              return plugin.apply(_this);
-          });
-      };
-      Monitor.prototype.addListeners = function () {
-          var _this = this;
-          var _a;
-          // 接收插件上报事件, 将任务插入调度器
-          (_a = this.$hook) === null || _a === void 0 ? void 0 : _a.on('report', function (data) {
-              var _a, _b;
-              console.log('report 事件触发, 数据:', data);
-              var pkgData = (_a = _this.builder) === null || _a === void 0 ? void 0 : _a.build(data);
-              pkgData && ((_b = _this.schedule) === null || _b === void 0 ? void 0 : _b.push(pkgData));
-          });
-      };
-      return Monitor;
-  }());
-
   exports.Browser = Browser;
-  exports.default = Monitor;
+  exports.default = Reporter;
 
   Object.defineProperty(exports, '__esModule', { value: true });
 

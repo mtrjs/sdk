@@ -1,12 +1,13 @@
 import Monitor from './index';
+import { IData, Send } from './type';
 
-interface Config {
+export interface Config {
   // 储存任务满 max 则消费
   max: number;
   client: Monitor;
 }
 
-interface Task {
+export interface Task {
   id: number;
   data: IData;
 }
@@ -20,10 +21,10 @@ let id = 0;
  * @class Schedule
  */
 export class Schedule {
-  private tasks: Task[];
-  private max: number;
-  private client: Monitor;
-  private pending: boolean = false;
+  tasks: Task[];
+  max: number;
+  client: Monitor;
+  pending: boolean = false;
 
   constructor(config: Config) {
     this.client = config.client;

@@ -1,11 +1,9 @@
-import { EventEmitter } from '@tubit/common/lib/events';
 import { Builder } from './builder';
 import { Schedule } from './schedule';
-import { Browser } from '../plugins/browser';
+import { IPlugin, LData, ReporterConfig } from './type';
+import { EventEmitter } from '@tubit/common/lib/events';
 
-export { Browser };
-
-function assertConfig(config: MonitorConfig) {
+function assertConfig(config: ReporterConfig) {
   if (!config) {
     throw new Error('缺少 SDK 配置信息');
   }
@@ -23,29 +21,30 @@ function assertConfig(config: MonitorConfig) {
  * Core 实例
  *
  * @export
- * @class Monitor
+ * @class Reporter
  */
-export default class Monitor {
+export default class Reporter {
   // 事件中心
-  public $hook!: EventEmitter;
+  $hook!: EventEmitter;
   // 实例配置
-  public config!: MonitorConfig;
+  config!: ReporterConfig;
   // 数据包装器
-  private builder!: Builder;
+  builder!: Builder;
   // 事件上报中心
-  private schedule!: Schedule;
+  schedule!: Schedule;
 
-  init(config: MonitorConfig) {
+  init(config: ReporterConfig) {
     assertConfig(config);
 
     this.config = config;
 
-    const { plugins = [], appId } = config;
+    const { plugins = [], appId, maxPool = 10 } = config;
 
     this.builder = new Builder({ appId });
 
-    this.schedule = new Schedule({ max: 2, client: this });
+    this.schedule = new Schedule({ max: maxPool, client: this });
 
+    // @ts-ignore
     this.$hook = new EventEmitter();
 
     // 插件注册

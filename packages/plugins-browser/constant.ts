@@ -1,6 +1,3 @@
-// 上报服务端地址
-export const serverUrl = '';
-
 /**
  * 上报类型
  *

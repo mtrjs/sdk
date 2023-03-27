@@ -1,5 +1,6 @@
-import { generateRandom } from '@tubit/common/lib/random';
-import pkg from '../package.json';
+// import { generateRandom } from '@tubit/common/lib/random';
+import pkg from '../../package.json';
+import { IBaseData, LData } from './type';
 
 interface Config {
   appId: string;
@@ -13,12 +14,12 @@ interface Config {
  */
 export class Builder {
   baseData: IBaseData;
-  cache: Map<string, string>
+  cache: Map<string, string>;
 
   constructor(config: Config) {
     const { appId } = config;
-    const traceId = generateRandom();
-    this.cache = new Map()
+    const traceId = 'generateRandom()';
+    this.cache = new Map();
 
     this.baseData = {
       appId,
@@ -28,9 +29,6 @@ export class Builder {
       },
     };
   }
-
-  
-
 
   build(data: LData) {
     return { t: +new Date(), ...this.baseData, ...data };
