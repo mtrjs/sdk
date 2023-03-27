@@ -1,12 +1,11 @@
 {
   "name": "@tubefast/core",
-  "version": "1.0.1-alpha.0",
+  "version": "1.0.1-alpha.7",
   "description": "",
   "main": "dist/index.min.js",
   "scripts": {
     "build": "rollup -c",
-    "build:watch": "rollup -c --watch",
-    "prepublish": "pnpm build"
+    "build:watch": "rollup -c --watch"
   },
   "repository": {
     "type": "git",

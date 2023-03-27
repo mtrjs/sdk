@@ -74,9 +74,124 @@
     };
     return _assign.apply(this, arguments);
   };
+  function __awaiter(thisArg, _arguments, P, generator) {
+    function adopt(value) {
+      return value instanceof P ? value : new P(function (resolve) {
+        resolve(value);
+      });
+    }
+    return new (P || (P = Promise))(function (resolve, reject) {
+      function fulfilled(value) {
+        try {
+          step(generator.next(value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function rejected(value) {
+        try {
+          step(generator["throw"](value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function step(result) {
+        result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+      }
+      step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+  }
+  function __generator(thisArg, body) {
+    var _ = {
+        label: 0,
+        sent: function sent() {
+          if (t[0] & 1) throw t[1];
+          return t[1];
+        },
+        trys: [],
+        ops: []
+      },
+      f,
+      y,
+      t,
+      g;
+    return g = {
+      next: verb(0),
+      "throw": verb(1),
+      "return": verb(2)
+    }, typeof Symbol === "function" && (g[Symbol.iterator] = function () {
+      return this;
+    }), g;
+    function verb(n) {
+      return function (v) {
+        return step([n, v]);
+      };
+    }
+    function step(op) {
+      if (f) throw new TypeError("Generator is already executing.");
+      while (g && (g = 0, op[0] && (_ = 0)), _) try {
+        if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+        if (y = 0, t) op = [op[0] & 2, t.value];
+        switch (op[0]) {
+          case 0:
+          case 1:
+            t = op;
+            break;
+          case 4:
+            _.label++;
+            return {
+              value: op[1],
+              done: false
+            };
+          case 5:
+            _.label++;
+            y = op[1];
+            op = [0];
+            continue;
+          case 7:
+            op = _.ops.pop();
+            _.trys.pop();
+            continue;
+          default:
+            if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) {
+              _ = 0;
+              continue;
+            }
+            if (op[0] === 3 && (!t || op[1] > t[0] && op[1] < t[3])) {
+              _.label = op[1];
+              break;
+            }
+            if (op[0] === 6 && _.label < t[1]) {
+              _.label = t[1];
+              t = op;
+              break;
+            }
+            if (t && _.label < t[2]) {
+              _.label = t[2];
+              _.ops.push(op);
+              break;
+            }
+            if (t[2]) _.ops.pop();
+            _.trys.pop();
+            continue;
+        }
+        op = body.call(thisArg, _);
+      } catch (e) {
+        op = [6, e];
+        y = 0;
+      } finally {
+        f = t = 0;
+      }
+      if (op[0] & 5) throw op[1];
+      return {
+        value: op[0] ? op[1] : void 0,
+        done: true
+      };
+    }
+  }
 
   var name = "@tubefast/core";
-  var version = "1.0.0";
+  var version = "1.0.1-alpha.7";
   var description = "";
   var main = "dist/index.min.js";
   var scripts = {
@@ -111,12 +226,15 @@
   	rollup: "^3.17.3",
   	"rollup-plugin-clear": "^2.0.7",
   	tslib: "^2.5.0",
-  	typescript: "^4.9.5"
-  };
-  var dependencies = {
+  	typescript: "^4.9.5",
   	"@tubit/common": "^1.5.1",
   	jest: "^29.4.3",
   	"rollup-plugin-ts": "^3.2.0"
+  };
+  var dependencies = {
+  };
+  var publishConfig = {
+  	registry: "https://repo.tuzhanai.com/repository/tuzhan-npm-release/"
   };
   var pkg = {
   	name: name,
@@ -131,9 +249,16 @@
   	bugs: bugs,
   	homepage: homepage,
   	devDependencies: devDependencies,
-  	dependencies: dependencies
+  	dependencies: dependencies,
+  	publishConfig: publishConfig
   };
 
+  function guid() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+          var r = (Math.random() * 16) | 0, v = c == 'x' ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+      });
+  }
   /**
    * 数据处理
    *
@@ -143,7 +268,7 @@
   var Builder = /** @class */ (function () {
       function Builder(config) {
           var appId = config.appId;
-          var traceId = 'generateRandom()';
+          var traceId = guid();
           this.cache = new Map();
           this.baseData = {
               appId: appId,
@@ -168,47 +293,99 @@
    */
   var Schedule = /** @class */ (function () {
       function Schedule(config) {
-          this.pending = false;
           this.client = config.client;
           this.tasks = [];
-          this.max = config.max || 10;
+          this.maxPool = config.maxPool;
       }
-      // 消费任务
-      Schedule.prototype.consumer = function () {
-          var _this = this;
-          if (this.tasks.length < this.max || this.pending)
-              return;
-          var dsn = this.client.config.dsn;
-          this.pending = true;
-          this.client.$hook.emit('send', function (send) {
-              var datas = _this.tasks.slice(0, _this.max).map(function (_a) {
-                  var data = _a.data;
-                  return data;
-              });
-              console.log('send 任务发送: 数据', { data: datas });
-              send(dsn + '/v1/report', { data: datas })
-                  .then(function () {
-                  console.log('send 成功, 清除成功任务');
-                  _this.tasks = _this.tasks.slice(_this.max);
-                  _this.consumer();
-              })
-                  .finally(function () {
-                  _this.pending = false;
+      /**
+       * 任务消费
+       *
+       * @param {boolean} [clear] 是否清空
+       * @return {*}
+       * @memberof Schedule
+       */
+      Schedule.prototype.consumer = function (clear) {
+          return __awaiter(this, void 0, void 0, function () {
+              var runTasks, data;
+              var _this = this;
+              return __generator(this, function (_a) {
+                  switch (_a.label) {
+                      case 0:
+                          if (!clear && this.tasks.length < this.maxPool)
+                              return [2 /*return*/];
+                          runTasks = this.tasks.slice(0, this.maxPool);
+                          this.tasks = this.tasks.slice(this.maxPool);
+                          data = runTasks.map(function (_a) {
+                              var data = _a.data;
+                              return data;
+                          });
+                          _a.label = 1;
+                      case 1:
+                          _a.trys.push([1, 3, , 4]);
+                          return [4 /*yield*/, this.send(data)];
+                      case 2:
+                          _a.sent();
+                          setTimeout(function () {
+                              _this.consumer();
+                          }, 1000);
+                          return [3 /*break*/, 4];
+                      case 3:
+                          _a.sent();
+                          return [3 /*break*/, 4];
+                      case 4: return [2 /*return*/];
+                  }
               });
           });
       };
-      // 储存任务
+      /**
+       *储存一个延时任务
+       *
+       * @param {IData} data
+       * @memberof Schedule
+       */
       Schedule.prototype.push = function (data) {
           var task = { id: ++id, data: data };
           this.tasks.push(task);
           this.consumer();
       };
-      // 清空任务并消费
-      Schedule.prototype.clear = function () {
-          this.consumer();
+      /**
+       * 向插件发送 send 事件
+       *
+       * @param {IData[]} data
+       * @memberof Schedule
+       */
+      Schedule.prototype.send = function (data) {
+          this.client.$hook.emit('send', function (send) {
+              console.log('send 任务发送: 数据', { data: data });
+              return send(data).then(function (res) {
+                  console.log('send 成功!');
+                  return res;
+              });
+          });
       };
-      // 立即上报
-      Schedule.prototype.immediate = function (report) { };
+      /**
+       * 清空任务
+       *
+       * @memberof Schedule
+       */
+      Schedule.prototype.clear = function () {
+          return __awaiter(this, void 0, void 0, function () {
+              return __generator(this, function (_a) {
+                  this.consumer(true);
+                  return [2 /*return*/];
+              });
+          });
+      };
+      /**
+       * 无需等待, 立即上报一个任务
+       *
+       * @param {IData} data
+       * @return {*}
+       * @memberof Schedule
+       */
+      Schedule.prototype.immediate = function (data) {
+          return this.send([data]);
+      };
       return Schedule;
   }());
 
@@ -417,7 +594,7 @@
           this.config = config;
           var _b = config.plugins, plugins = _b === void 0 ? [] : _b, appId = config.appId, _c = config.maxPool, maxPool = _c === void 0 ? 10 : _c;
           this.builder = new Builder({ appId: appId });
-          this.schedule = new Schedule({ max: maxPool, client: this });
+          this.schedule = new Schedule({ maxPool: maxPool, client: this });
           // @ts-ignore
           this.$hook = new EventEmitter();
           // 插件注册
@@ -427,6 +604,14 @@
           // 唤起 init 事件
           (_a = this.$hook) === null || _a === void 0 ? void 0 : _a.emit('init', {});
       };
+      /**
+       * 插件注册
+       *
+       * @private
+       * @param {IPlugin[]} plugins
+       * @return {*}
+       * @memberof Reporter
+       */
       Reporter.prototype.registerPlugins = function (plugins) {
           var _this = this;
           if (!Array.isArray(plugins))
@@ -435,16 +620,43 @@
               return plugin.apply(_this);
           });
       };
+      /**
+       * 挂在事件
+       *
+       * @private
+       * @memberof Reporter
+       */
       Reporter.prototype.addListeners = function () {
           var _this = this;
           var _a;
           // 接收插件上报事件, 将任务插入调度器
-          (_a = this.$hook) === null || _a === void 0 ? void 0 : _a.on('report', function (data) {
-              var _a, _b;
+          (_a = this.$hook) === null || _a === void 0 ? void 0 : _a.on('report', function (_a) {
+              var _b, _c, _d;
+              var data = _a.data, runTime = _a.runTime;
               console.log('report 事件触发, 数据:', data);
-              var pkgData = (_a = _this.builder) === null || _a === void 0 ? void 0 : _a.build(data);
-              pkgData && ((_b = _this.schedule) === null || _b === void 0 ? void 0 : _b.push(pkgData));
+              var pkgData = (_b = _this.builder) === null || _b === void 0 ? void 0 : _b.build(data);
+              if (!pkgData)
+                  return;
+              if (!runTime || runTime === 'delay') {
+                  (_c = _this.schedule) === null || _c === void 0 ? void 0 : _c.push(pkgData);
+              }
+              else if (runTime === 'immediately') {
+                  (_d = _this.schedule) === null || _d === void 0 ? void 0 : _d.immediate(pkgData);
+              }
           });
+      };
+      Reporter.prototype.getReportParams = function () {
+          return {
+              url: this.config.dsn + '/v1/report',
+              method: 'POST',
+              headers: {},
+          };
+      };
+      Reporter.prototype.getTasks = function () {
+          return this.schedule.tasks;
+      };
+      Reporter.prototype.getConfig = function () {
+          return this.config;
       };
       return Reporter;
   }());
@@ -498,18 +710,29 @@
               _this_1.overrideXHR();
           });
           client.$hook.on('send', function (report) {
-              report(_this_1.send);
+              requestIdleCallback(function () { return report(_this_1.send.bind(_this_1)); });
           });
+          // 特殊处理, 刷新或者离开页面前保证缓存的数据能够上报
           window.addEventListener('unload', function () {
-              client.$hook.emit('report', {});
+              var tasks = client.getTasks();
+              var data = tasks.map(function (_a) {
+                  var data = _a.data;
+                  return data;
+              });
+              _this_1.send(data);
           });
       };
-      Browser.prototype.send = function (url, body) {
-          var data = body.data;
+      Browser.prototype.send = function (data) {
+          var _a = this.client.getReportParams(), url = _a.url, method = _a.method;
           var formData = new FormData();
           formData.append('data', JSON.stringify(data));
           if (typeof navigator.sendBeacon === 'function') {
               return Promise.resolve(navigator.sendBeacon(url, formData));
+          }
+          else if (typeof fetch === 'function') {
+              return fetch(url, { method: method, keepalive: true }).then(function () {
+                  return true;
+              });
           }
           else {
               return new Promise(function (r, j) {
@@ -520,22 +743,23 @@
                   XHR.addEventListener('error', function () {
                       j();
                   });
-                  XHR.open('POST', url);
+                  XHR.open(method, url);
                   XHR.send(formData);
               });
           }
       };
-      Browser.prototype.report = function (data) {
+      Browser.prototype.report = function (body) {
           var _a;
+          var data = body.data;
           var eid = data.eid, l = data.l;
           var ua = navigator.userAgent;
-          (_a = this.client) === null || _a === void 0 ? void 0 : _a.$hook.emit('report', {
-              eid: eid,
-              l: _assign(_assign({}, l), { ua: ua }),
-          });
+          (_a = this.client) === null || _a === void 0 ? void 0 : _a.$hook.emit('report', _assign(_assign({}, body), { data: {
+                  eid: eid,
+                  l: _assign(_assign({}, l), { ua: ua }),
+              } }));
       };
       Browser.prototype.overrideXHR = function () {
-          var monitor = this.client;
+          var Reporter = this.client;
           if (!XMLHttpRequest)
               return;
           var _open = XMLHttpRequest.prototype.open;
@@ -561,9 +785,11 @@
                   var _a = _this_1, status = _a.status, statusText = _a.statusText;
                   if (status > 200) {
                       _this_1.reporterCollect = _assign(_assign({}, _this_1.reporterCollect), { endTime: endTime, status: status, statusText: statusText });
-                      monitor === null || monitor === void 0 ? void 0 : monitor.$hook.emit('report', {
-                          eid: '1001',
-                          l: _this_1.reporterCollect,
+                      Reporter === null || Reporter === void 0 ? void 0 : Reporter.$hook.emit('report', {
+                          data: {
+                              eid: '1001',
+                              l: _this_1.reporterCollect,
+                          },
                       });
                   }
               });
@@ -598,7 +824,7 @@
                   if (status && status > 300) {
                       var endTime = Date.now();
                       Object.assign(reportData, { status: status, statusText: statusText, endTime: endTime });
-                      _this.report({ eid: '1001', l: reportData });
+                      _this.report({ data: { eid: '1001', l: reportData } });
                   }
                   return result;
               })
@@ -608,8 +834,10 @@
                   Object.assign(reportData, { name: name, message: message, stack: stack });
                   reportData.endTime = endTime;
                   _this.report({
-                      eid: '1001',
-                      l: reportData,
+                      data: {
+                          eid: '1001',
+                          l: reportData,
+                      },
                   });
                   return error;
               });
@@ -618,7 +846,7 @@
       /**
        * Js 异常捕捉
        *
-       * @param {Monitor} client
+       * @param {Reporter} client
        * @memberof Browser
        */
       Browser.prototype.listenError = function () {
@@ -630,14 +858,16 @@
                       message = (error === null || error === void 0 ? void 0 : error.message) || '';
                   }
                   _this_1.report({
-                      eid: '1003',
-                      l: {
-                          colno: colno,
-                          message: message,
-                          filename: filename,
-                          lineno: lineno,
-                          stack: error === null || error === void 0 ? void 0 : error.stack,
-                          type: ErrorType.JS,
+                      data: {
+                          eid: '1003',
+                          l: {
+                              colno: colno,
+                              message: message,
+                              filename: filename,
+                              lineno: lineno,
+                              stack: error === null || error === void 0 ? void 0 : error.stack,
+                              type: ErrorType.JS,
+                          },
                       },
                   });
               }
@@ -646,7 +876,7 @@
       /**
        * Promise 错误捕捉
        *
-       * @param {Monitor} client
+       * @param {Reporter} client
        * @memberof Browser
        */
       Browser.prototype.promiseError = function () {
@@ -668,15 +898,17 @@
                   reportData.name = name_1;
               }
               _this_1.report({
-                  eid: '1003',
-                  l: _assign({ type: ErrorType.PROMISE }, reportData),
+                  data: {
+                      eid: '1003',
+                      l: _assign({ type: ErrorType.PROMISE }, reportData),
+                  },
               });
           });
       };
       /**
        * 性能数据采集
        *
-       * @param {Monitor} client
+       * @param {Reporter} client
        * @memberof Browser
        */
       Browser.prototype.timing = function () {
@@ -719,8 +951,11 @@
                   var navigation = _a[0], lcp = _a[1], fcp = _a[2];
                   var timing = _this_1.formatTiming(navigation);
                   _this_1.report({
-                      eid: '1000',
-                      l: _assign(_assign({}, timing), { lcp: Number(lcp.toFixed(2)), fcp: Number(fcp.toFixed(2)) }),
+                      runTime: 'immediately',
+                      data: {
+                          eid: '1000',
+                          l: _assign(_assign({}, timing), { lcp: Number(lcp.toFixed(2)), fcp: Number(fcp.toFixed(2)) }),
+                      },
                   });
               });
           }
@@ -775,7 +1010,7 @@
                       loadEventEnd: loadEventEnd,
                       redirectCount: redirectCount,
                   };
-                  _this_1.report({ eid: '1000', l: timing });
+                  _this_1.report({ runTime: 'immediately', data: { eid: '1000', l: timing } });
               });
           }
       };

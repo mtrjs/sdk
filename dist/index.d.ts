@@ -4,9 +4,7 @@ interface IPlugin {
     apply(instance: Reporter): void;
     send: Send;
 }
-type Send = (url: string, data: {
-    data: IData[];
-}) => Promise<boolean>;
+type Send = (data: IData[]) => Promise<boolean>;
 interface ReporterConfig {
     // 应用 ID
     appId: string;
@@ -41,9 +39,16 @@ interface IPlatformBaseData {
 interface LData extends IPlatformBaseData {
     // 事件 id
     eid: string;
-    l: Record<string, string | number>;
+    l: Record<string, any>;
 }
 type IData = IBaseData & LData;
+// delay: 任务缓存, immediately: 立即执行
+type RunTime = "delay" | "immediately";
+interface ReportParams {
+    data: LData;
+    // 执行时机
+    runTime?: RunTime;
+}
 interface Config {
     appId: string;
 }
@@ -59,7 +64,7 @@ declare class Builder {
     constructor(config: Config);
     build(data: LData): {
         eid: string;
-        l: Record<string, string | number>;
+        l: Record<string, any>;
         ua?: string | undefined;
         appId: string;
         traceId: string;
@@ -70,14 +75,10 @@ declare class Builder {
         t: number;
     };
 }
-declare module ReporterWrapper {
-    export { Reporter };
-}
-import Monitor = ReporterWrapper.Reporter;
 interface Config$0 {
-    // 储存任务满 max 则消费
-    max: number;
-    client: Monitor;
+    // 储存任务满 maxPool 则消费
+    maxPool: number;
+    client: Reporter;
 }
 interface Task {
     id: number;
@@ -91,18 +92,45 @@ interface Task {
  */
 declare class Schedule {
     tasks: Task[];
-    max: number;
-    client: Monitor;
-    pending: boolean;
+    maxPool: number;
+    client: Reporter;
     constructor(config: Config$0);
-    // 消费任务
-    consumer(): void;
-    // 储存任务
+    /**
+     * 任务消费
+     *
+     * @param {boolean} [clear] 是否清空
+     * @return {*}
+     * @memberof Schedule
+     */
+    consumer(clear?: boolean): Promise<void>;
+    /**
+     *储存一个延时任务
+     *
+     * @param {IData} data
+     * @memberof Schedule
+     */
     push(data: IData): void;
-    // 清空任务并消费
-    clear(): void;
-    // 立即上报
-    immediate(report: Function): void;
+    /**
+     * 向插件发送 send 事件
+     *
+     * @param {IData[]} data
+     * @memberof Schedule
+     */
+    send(data: IData[]): void;
+    /**
+     * 清空任务
+     *
+     * @memberof Schedule
+     */
+    clear(): Promise<void>;
+    /**
+     * 无需等待, 立即上报一个任务
+     *
+     * @param {IData} data
+     * @return {*}
+     * @memberof Schedule
+     */
+    immediate(data: IData): void;
 }
 /**
  * Core 实例
@@ -120,8 +148,29 @@ declare class Reporter {
     // 事件上报中心
     schedule: Schedule;
     init(config: ReporterConfig): void;
+    /**
+     * 插件注册
+     *
+     * @private
+     * @param {IPlugin[]} plugins
+     * @return {*}
+     * @memberof Reporter
+     */
     private registerPlugins;
+    /**
+     * 挂在事件
+     *
+     * @private
+     * @memberof Reporter
+     */
     private addListeners;
+    getReportParams(): {
+        url: string;
+        method: string;
+        headers: {};
+    };
+    getTasks(): Task[];
+    getConfig(): ReporterConfig;
 }
 // V2 是相对时间, V1 是时间戳
 interface IPerformanceTimingV2 {
@@ -178,39 +227,34 @@ interface Options {
  * @export
  * @class Browser
  */
-declare class Browser {
+declare class Browser implements IPlugin {
     private options;
     name: string;
     client: any;
     constructor(options?: Options);
     apply(client: any): void;
-    send(url: string, body: {
-        data: IData[];
-    }): Promise<boolean>;
-    report(data: {
-        eid: string;
-        l: Record<string, any>;
-    }): void;
+    send(data: IData[]): Promise<boolean>;
+    report(body: ReportParams): void;
     overrideXHR(): void;
     overrideFetch(): void;
     /**
      * Js 异常捕捉
      *
-     * @param {Monitor} client
+     * @param {Reporter} client
      * @memberof Browser
      */
     listenError(): void;
     /**
      * Promise 错误捕捉
      *
-     * @param {Monitor} client
+     * @param {Reporter} client
      * @memberof Browser
      */
     promiseError(): void;
     /**
      * 性能数据采集
      *
-     * @param {Monitor} client
+     * @param {Reporter} client
      * @memberof Browser
      */
     timing(): void;

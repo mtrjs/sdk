@@ -1,6 +1,6 @@
 import { Builder } from './builder';
 import { Schedule } from './schedule';
-import { IPlugin, LData, ReporterConfig } from './type';
+import { IPlugin, LData, ReporterConfig, ReportParams } from './type';
 import { EventEmitter } from '@tubit/common/lib/events';
 
 function assertConfig(config: ReporterConfig) {
@@ -42,7 +42,7 @@ export default class Reporter {
 
     this.builder = new Builder({ appId });
 
-    this.schedule = new Schedule({ max: maxPool, client: this });
+    this.schedule = new Schedule({ maxPool, client: this });
 
     // @ts-ignore
     this.$hook = new EventEmitter();
@@ -56,20 +56,53 @@ export default class Reporter {
     // 唤起 init 事件
     this.$hook?.emit('init', {});
   }
-
+  /**
+   * 插件注册
+   *
+   * @private
+   * @param {IPlugin[]} plugins
+   * @return {*}
+   * @memberof Reporter
+   */
   private registerPlugins(plugins: IPlugin[]) {
     if (!Array.isArray(plugins)) return;
     plugins.map((plugin) => {
       return plugin.apply(this);
     });
   }
-
+  /**
+   * 挂在事件
+   *
+   * @private
+   * @memberof Reporter
+   */
   private addListeners() {
     // 接收插件上报事件, 将任务插入调度器
-    this.$hook?.on('report', (data: LData) => {
+    this.$hook?.on<ReportParams>('report', ({ data, runTime }: ReportParams) => {
       console.log('report 事件触发, 数据:', data);
       const pkgData = this.builder?.build(data);
-      pkgData && this.schedule?.push(pkgData);
+      if (!pkgData) return;
+      if (!runTime || runTime === 'delay') {
+        this.schedule?.push(pkgData);
+      } else if (runTime === 'immediately') {
+        this.schedule?.immediate(pkgData);
+      }
     });
+  }
+
+  getReportParams() {
+    return {
+      url: this.config.dsn + '/v1/report',
+      method: 'POST',
+      headers: {},
+    };
+  }
+
+  getTasks() {
+    return this.schedule.tasks;
+  }
+
+  getConfig() {
+    return this.config;
   }
 }

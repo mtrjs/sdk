@@ -1,5 +1,5 @@
 import { ErrorType, RequestType } from './constant';
-import { IData } from '../core/type';
+import { IData, IPlugin, ReportParams } from '../core/type';
 
 // V2 是相对时间, V1 是时间戳
 interface IPerformanceTimingV2 {
@@ -76,7 +76,7 @@ interface IError extends Event {
  * @export
  * @class Browser
  */
-export class Browser {
+export class Browser implements IPlugin {
   private options: Options;
   name: string = 'Browser';
   client: any;
@@ -100,20 +100,27 @@ export class Browser {
     });
 
     client.$hook.on('send', (report: any) => {
-      report(this.send);
+      requestIdleCallback(() => report(this.send.bind(this)));
     });
 
+    // 特殊处理, 刷新或者离开页面前保证缓存的数据能够上报
     window.addEventListener('unload', () => {
-      client.$hook.emit('report', {});
+      const tasks = client.getTasks();
+      const data = tasks.map(({ data }: any) => data);
+      this.send(data);
     });
   }
 
-  send(url: string, body: { data: IData[] }) {
-    const { data } = body;
+  send(data: IData[]) {
+    const { url, method } = this.client.getReportParams();
     const formData = new FormData();
     formData.append('data', JSON.stringify(data));
     if (typeof navigator.sendBeacon === 'function') {
       return Promise.resolve(navigator.sendBeacon(url, formData));
+    } else if (typeof fetch === 'function') {
+      return fetch(url, { method, keepalive: true }).then(() => {
+        return true;
+      });
     } else {
       return new Promise<boolean>((r, j) => {
         const XHR = new XMLHttpRequest();
@@ -123,20 +130,24 @@ export class Browser {
         XHR.addEventListener('error', function () {
           j();
         });
-        XHR.open('POST', url);
+        XHR.open(method, url);
         XHR.send(formData);
       });
     }
   }
 
-  report(data: { eid: string; l: Record<string, any> }) {
+  report(body: ReportParams) {
+    const { data } = body;
     const { eid, l } = data;
     const ua = navigator.userAgent;
     this.client?.$hook.emit('report', {
-      eid,
-      l: {
-        ...l,
-        ua,
+      ...body,
+      data: {
+        eid,
+        l: {
+          ...l,
+          ua,
+        },
       },
     });
   }
@@ -173,8 +184,10 @@ export class Browser {
           };
 
           Reporter?.$hook.emit('report', {
-            eid: '1001',
-            l: this.reporterCollect,
+            data: {
+              eid: '1001',
+              l: this.reporterCollect,
+            },
           });
         }
       });
@@ -210,7 +223,7 @@ export class Browser {
           if (status && status > 300) {
             const endTime = Date.now();
             Object.assign(reportData, { status, statusText, endTime });
-            _this.report({ eid: '1001', l: reportData });
+            _this.report({ data: { eid: '1001', l: reportData } });
           }
           return result;
         })
@@ -221,8 +234,10 @@ export class Browser {
 
           reportData.endTime = endTime;
           _this.report({
-            eid: '1001',
-            l: reportData,
+            data: {
+              eid: '1001',
+              l: reportData,
+            },
           });
 
           return error;
@@ -247,14 +262,16 @@ export class Browser {
           }
 
           this.report({
-            eid: '1003',
-            l: {
-              colno,
-              message,
-              filename,
-              lineno,
-              stack: error?.stack,
-              type: ErrorType.JS,
+            data: {
+              eid: '1003',
+              l: {
+                colno,
+                message,
+                filename,
+                lineno,
+                stack: error?.stack,
+                type: ErrorType.JS,
+              },
             },
           });
         }
@@ -286,10 +303,12 @@ export class Browser {
         reportData.name = name;
       }
       this.report({
-        eid: '1003',
-        l: {
-          type: ErrorType.PROMISE,
-          ...reportData,
+        data: {
+          eid: '1003',
+          l: {
+            type: ErrorType.PROMISE,
+            ...reportData,
+          },
         },
       });
     });
@@ -343,11 +362,14 @@ export class Browser {
       Promise.all([navigationP, lcpP, fcpP]).then(([navigation, lcp, fcp]) => {
         const timing = this.formatTiming(navigation);
         this.report({
-          eid: '1000',
-          l: {
-            ...timing,
-            lcp: Number(lcp.toFixed(2)),
-            fcp: Number(fcp.toFixed(2)),
+          runTime: 'immediately',
+          data: {
+            eid: '1000',
+            l: {
+              ...timing,
+              lcp: Number(lcp.toFixed(2)),
+              fcp: Number(fcp.toFixed(2)),
+            },
           },
         });
       });
@@ -426,7 +448,7 @@ export class Browser {
           loadEventEnd,
           redirectCount,
         };
-        this.report({ eid: '1000', l: timing });
+        this.report({ runTime: 'immediately', data: { eid: '1000', l: timing } });
       });
     }
   }

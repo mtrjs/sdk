@@ -6,7 +6,7 @@ export interface IPlugin {
   send: Send;
 }
 
-export type Send = (url: string, data: { data: IData[] }) => Promise<boolean>;
+export type Send = (data: IData[]) => Promise<boolean>;
 
 export interface ReporterConfig {
   // 应用 ID
@@ -45,7 +45,16 @@ export interface IPlatformBaseData {
 export interface LData extends IPlatformBaseData {
   // 事件 id
   eid: string;
-  l: Record<string, string | number>;
+  l: Record<string, any>;
 }
 
 export type IData = IBaseData & LData;
+
+// delay: 任务缓存, immediately: 立即执行
+export type RunTime = 'delay' | 'immediately';
+
+export interface ReportParams {
+  data: LData;
+  // 执行时机
+  runTime?: RunTime;
+}
