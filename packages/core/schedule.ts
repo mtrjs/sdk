@@ -1,10 +1,10 @@
-import Monitor from './index';
+import Reporter from './index';
 import { IData, Send } from './type';
 
 export interface Config {
   // 储存任务满 max 则消费
   max: number;
-  client: Monitor;
+  client: Reporter;
 }
 
 export interface Task {
@@ -23,7 +23,7 @@ let id = 0;
 export class Schedule {
   tasks: Task[];
   max: number;
-  client: Monitor;
+  client: Reporter;
   pending: boolean = false;
 
   constructor(config: Config) {

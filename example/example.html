@@ -7,11 +7,13 @@
     <title>Document</title>
   </head>
   <body>
-    <script src="../monitor.min.js"></script>
+    <script src="../index.min.js"></script>
     <script>
       var { default: Monitor, Browser } = window.monitor;
-      new Monitor({
+      const monitor = new Monitor();
+      monitor.init({
         appId: '',
+        dsn: '',
         plugins: [new Browser()],
       });
     </script>

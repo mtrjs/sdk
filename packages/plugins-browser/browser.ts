@@ -142,7 +142,7 @@ export class Browser {
   }
 
   overrideXHR() {
-    const monitor = this.client;
+    const Reporter = this.client;
     if (!XMLHttpRequest) return;
     const _open = XMLHttpRequest.prototype.open;
     const _send = XMLHttpRequest.prototype.send;
@@ -172,7 +172,7 @@ export class Browser {
             statusText,
           };
 
-          monitor?.$hook.emit('report', {
+          Reporter?.$hook.emit('report', {
             eid: '1001',
             l: this.reporterCollect,
           });
@@ -233,7 +233,7 @@ export class Browser {
   /**
    * Js 异常捕捉
    *
-   * @param {Monitor} client
+   * @param {Reporter} client
    * @memberof Browser
    */
   listenError() {
@@ -265,7 +265,7 @@ export class Browser {
   /**
    * Promise 错误捕捉
    *
-   * @param {Monitor} client
+   * @param {Reporter} client
    * @memberof Browser
    */
   promiseError() {
@@ -298,7 +298,7 @@ export class Browser {
   /**
    * 性能数据采集
    *
-   * @param {Monitor} client
+   * @param {Reporter} client
    * @memberof Browser
    */
   timing() {
