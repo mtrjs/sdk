@@ -1,7 +1,7 @@
 import { Builder } from './builder';
 import { Schedule } from './schedule';
-import { IPlugin, LData, ReporterConfig, ReportParams } from './type';
-import { EventEmitter } from '@tubit/common/lib/events';
+import { IPlugin, ReporterConfig, ReportParams } from './type';
+import Emittery from 'emittery';
 
 function assertConfig(config: ReporterConfig) {
   if (!config) {
@@ -25,7 +25,7 @@ function assertConfig(config: ReporterConfig) {
  */
 export default class Reporter {
   // 事件中心
-  $hook!: EventEmitter;
+  $hook!: Emittery;
   // 实例配置
   config!: ReporterConfig;
   // 数据包装器
@@ -45,7 +45,7 @@ export default class Reporter {
     this.schedule = new Schedule({ maxPool, client: this });
 
     // @ts-ignore
-    this.$hook = new EventEmitter();
+    this.$hook = new Emittery();
 
     // 插件注册
     this.registerPlugins(plugins);
@@ -78,7 +78,7 @@ export default class Reporter {
    */
   private addListeners() {
     // 接收插件上报事件, 将任务插入调度器
-    this.$hook?.on<ReportParams>('report', ({ data, runTime }: ReportParams) => {
+    this.$hook?.on('report', ({ data, runTime }: ReportParams) => {
       console.log('report 事件触发, 数据:', data);
       const pkgData = this.builder?.build(data);
       if (!pkgData) return;

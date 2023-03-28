@@ -1,5 +1,1 @@
-
-
-export class Logger{
-  
-}
+export class Logger {}

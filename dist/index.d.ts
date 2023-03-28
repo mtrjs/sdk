@@ -1,4 +1,4 @@
-import { EventEmitter } from "@tubit/common/lib/events";
+import Emittery from "emittery";
 interface IPlugin {
     name: string;
     apply(instance: Reporter): void;
@@ -140,7 +140,7 @@ declare class Schedule {
  */
 declare class Reporter {
     // 事件中心
-    $hook: EventEmitter;
+    $hook: Emittery;
     // 实例配置
     config: ReporterConfig;
     // 数据包装器
