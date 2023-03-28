@@ -1,6 +1,7 @@
-import Monitor, { Browser } from '../monitor';
+import Reporter, { Browser } from '../monitor';
 
-const monitor = new Monitor({
+const monitor = new Reporter({
   appId: '',
+  dsn: '',
   plugins: [new Browser()],
 });
