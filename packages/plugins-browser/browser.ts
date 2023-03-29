@@ -70,6 +70,43 @@ interface IError extends Event {
   name?: string;
 }
 
+const indicators: Array<keyof IPerformanceTimingV2> = [
+  'navigationStart',
+  'unloadEventStart',
+  'unloadEventEnd',
+  'navigationStart',
+  'redirectStart',
+  'redirectEnd',
+  'fetchStart',
+  'domainLookupStart',
+  'domainLookupEnd',
+  'connectStart',
+  'secureConnectionStart',
+  'connectEnd',
+  'requestStart',
+  'responseStart',
+  'responseEnd',
+  'domLoading',
+  'domInteractive',
+  'domContentLoadedEventEnd',
+  'domContentLoadedEventStart',
+  'domComplete',
+  'loadEventStart',
+  'loadEventEnd',
+];
+
+function formatTiming(timing: IPerformanceTimingV2) {
+  const t: IPerformanceTimingV2 = {
+    redirectCount: timing.redirectCount,
+  };
+
+  indicators.forEach((key) => {
+    t[key] = Number((timing[key] || 0).toFixed(2));
+  });
+
+  return t;
+}
+
 /**
  * 浏览器端插件
  *
@@ -91,7 +128,6 @@ export class Browser implements IPlugin {
     if (!window) return;
 
     client.$hook.on('init', () => {
-      console.log('init 事件触发');
       this.timing();
       this.listenError();
       this.promiseError();
@@ -321,10 +357,9 @@ export class Browser implements IPlugin {
    * @memberof Browser
    */
   timing() {
-    let timing: IPerformanceTimingV2 = {};
     // v2
-    if (!!PerformanceObserver) {
-      const fcpP = new Promise<number>((r, j) => {
+    if (PerformanceObserver) {
+      const fcpP = new Promise<number>((r) => {
         const observer = new PerformanceObserver((list) => {
           list.getEntries().forEach((entry) => {
             if (entry.name === 'first-contentful-paint') {
@@ -336,7 +371,7 @@ export class Browser implements IPlugin {
         observer.observe({ type: 'paint', buffered: true });
       });
 
-      const lcpP = new Promise<number>((r, j) => {
+      const lcpP = new Promise<number>((r) => {
         const observer = new PerformanceObserver((list) => {
           const entries = list.getEntries();
           const lastEntry = entries[entries.length - 1];
@@ -345,7 +380,7 @@ export class Browser implements IPlugin {
         observer.observe({ type: 'largest-contentful-paint', buffered: true });
       });
 
-      const navigationP = new Promise<IPerformanceTimingV2>((r, j) => {
+      const navigationP = new Promise<IPerformanceTimingV2>((r) => {
         const perfObserver = (entries: PerformanceObserverEntryList) => {
           entries.getEntries().forEach((entry) => {
             const { entryType } = entry;
@@ -360,7 +395,7 @@ export class Browser implements IPlugin {
       });
 
       Promise.all([navigationP, lcpP, fcpP]).then(([navigation, lcp, fcp]) => {
-        const timing = this.formatTiming(navigation);
+        const timing = formatTiming(navigation);
         this.report({
           runTime: 'immediately',
           data: {
@@ -375,141 +410,33 @@ export class Browser implements IPlugin {
       });
     } else {
       window.addEventListener('load', () => {
-        let {
-          unloadEventStart,
-          unloadEventEnd,
-          navigationStart,
-          redirectStart,
-          redirectEnd,
-          fetchStart,
-          domainLookupStart,
-          domainLookupEnd,
-          connectStart,
-          secureConnectionStart,
-          connectEnd,
-          requestStart,
-          responseStart,
-          responseEnd,
-          domLoading,
-          domInteractive,
-          domContentLoadedEventEnd,
-          domContentLoadedEventStart,
-          domComplete,
-          loadEventStart,
-          loadEventEnd,
-        } = performance.timing;
-
+        const { navigationStart, unloadEventStart } = performance.timing;
         const { redirectCount } = performance.navigation;
-        const startAt = navigationStart || 0;
+        const startAt = Math.min(navigationStart, unloadEventStart) || 0;
 
-        unloadEventStart = unloadEventStart >= startAt ? unloadEventStart - startAt : 0;
-        unloadEventEnd = unloadEventEnd >= startAt ? unloadEventEnd - startAt : unloadEventStart;
-        redirectStart = redirectStart >= startAt ? redirectStart - startAt : unloadEventEnd;
-        redirectEnd = redirectEnd >= startAt ? redirectEnd - startAt : redirectStart;
-        fetchStart = fetchStart >= startAt ? fetchStart - startAt : redirectEnd;
-        domainLookupStart = domainLookupStart >= startAt ? domainLookupStart - startAt : fetchStart;
-        domainLookupEnd = domainLookupStart >= startAt ? domainLookupStart - startAt : domainLookupStart;
-        connectStart = connectStart >= startAt ? connectStart - startAt : domainLookupEnd;
-        secureConnectionStart = secureConnectionStart >= startAt ? secureConnectionStart - startAt : connectStart;
-        connectEnd = connectEnd >= startAt ? connectEnd - startAt : secureConnectionStart;
-        requestStart = requestStart ? requestStart - startAt : connectEnd;
-        responseStart = responseStart >= startAt ? responseStart - startAt : requestStart;
-        responseEnd = responseEnd >= startAt ? responseEnd - startAt : responseStart;
-        domLoading = domLoading >= startAt ? domLoading - startAt : responseEnd;
-        domInteractive = domInteractive >= startAt ? domInteractive - startAt : domLoading;
-        domContentLoadedEventStart =
-          domContentLoadedEventStart >= startAt ? domContentLoadedEventStart - startAt : domInteractive;
-        domContentLoadedEventEnd =
-          domContentLoadedEventEnd >= startAt ? domContentLoadedEventEnd - startAt : domContentLoadedEventStart;
-        domComplete = domComplete >= startAt ? domComplete - startAt : domContentLoadedEventEnd;
-        loadEventStart = loadEventStart >= startAt ? loadEventStart - startAt : domComplete;
-        loadEventEnd = loadEventEnd >= startAt ? loadEventEnd - startAt : loadEventStart;
-        timing = {
-          navigationStart: 0,
-          unloadEventStart,
-          unloadEventEnd,
-          redirectStart,
-          redirectEnd,
-          fetchStart,
-          domainLookupStart,
-          domainLookupEnd,
-          connectStart,
-          secureConnectionStart,
-          connectEnd,
-          requestStart,
-          responseStart,
-          responseEnd,
-          domLoading,
-          domInteractive,
-          domContentLoadedEventEnd,
-          domContentLoadedEventStart,
-          domComplete,
-          loadEventStart,
-          loadEventEnd,
+        const originTiming: Record<string, any> = {
+          ...performance.timing,
+          ...performance.navigation,
+        };
+
+        const timing: IPerformanceTimingV2 = {
           redirectCount,
         };
-        this.report({ runTime: 'immediately', data: { eid: '1000', l: timing } });
+
+        indicators.forEach((key, index) => {
+          if (originTiming[key] > 0) {
+            originTiming[key] -= startAt;
+          } else {
+            originTiming[key] = index === 0 ? 0 : originTiming[indicators[index - 1]];
+          }
+          timing[key] = originTiming[key];
+        });
+
+        this.report({
+          runTime: 'immediately',
+          data: { eid: '1000', l: timing },
+        });
       });
     }
-  }
-
-  formatTiming(timing: IPerformanceTimingV2) {
-    const {
-      unloadEventStart,
-      unloadEventEnd,
-      navigationStart,
-      redirectStart,
-      redirectEnd,
-      redirectCount,
-      fetchStart,
-      domainLookupStart,
-      domainLookupEnd,
-      connectStart,
-      secureConnectionStart,
-      connectEnd,
-      requestStart,
-      responseStart,
-      responseEnd,
-      domLoading,
-      domInteractive,
-      domContentLoadedEventEnd,
-      domContentLoadedEventStart,
-      domComplete,
-      loadEventStart,
-      loadEventEnd,
-    } = timing;
-    const t = {
-      unloadEventStart,
-      unloadEventEnd,
-      navigationStart,
-      redirectStart,
-      redirectEnd,
-      redirectCount,
-      fetchStart,
-      domainLookupStart,
-      domainLookupEnd,
-      connectStart,
-      secureConnectionStart,
-      connectEnd,
-      requestStart,
-      responseStart,
-      responseEnd,
-      domLoading,
-      domInteractive,
-      domContentLoadedEventEnd,
-      domContentLoadedEventStart,
-      domComplete,
-      loadEventStart,
-      loadEventEnd,
-    };
-
-    Object.entries(t).forEach(([key, value]) => {
-      if (typeof value === 'number') {
-        t[key as keyof IPerformanceTimingV2] = Number(value.toFixed(2));
-      } else {
-        t[key as keyof IPerformanceTimingV2] = value || 0;
-      }
-    });
-    return t;
   }
 }

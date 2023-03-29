@@ -1,3 +1,11 @@
 module.exports = {
-  presets: ['@babel/env', '@babel/preset-typescript'],
+  presets: [
+    [
+      '@babel/preset-env',
+      {
+        corejs: 3,
+        useBuiltIns: 'usage',
+      },
+    ],
+  ],
 };

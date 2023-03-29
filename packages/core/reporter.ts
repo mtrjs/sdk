@@ -1,7 +1,8 @@
 import { Builder } from './builder';
 import { Schedule } from './schedule';
 import { IPlugin, ReporterConfig, ReportParams } from './type';
-import Emittery from 'emittery';
+import Ev from '../lib/Event';
+import logger from '../lib/logger';
 
 function assertConfig(config: ReporterConfig) {
   if (!config) {
@@ -25,7 +26,7 @@ function assertConfig(config: ReporterConfig) {
  */
 export default class Reporter {
   // 事件中心
-  $hook!: Emittery;
+  $hook!: Ev;
   // 实例配置
   config!: ReporterConfig;
   // 数据包装器
@@ -33,19 +34,19 @@ export default class Reporter {
   // 事件上报中心
   schedule!: Schedule;
 
-  init(config: ReporterConfig) {
+  constructor(config: ReporterConfig) {
     assertConfig(config);
-
     this.config = config;
+  }
 
-    const { plugins = [], appId, maxPool = 10 } = config;
+  init() {
+    const { plugins = [], appId, maxPool = 10 } = this.config;
 
     this.builder = new Builder({ appId });
 
     this.schedule = new Schedule({ maxPool, client: this });
 
-    // @ts-ignore
-    this.$hook = new Emittery();
+    this.$hook = new Ev();
 
     // 插件注册
     this.registerPlugins(plugins);
@@ -55,6 +56,7 @@ export default class Reporter {
 
     // 唤起 init 事件
     this.$hook?.emit('init', {});
+    logger.info('sdk init');
   }
   /**
    * 插件注册
@@ -79,7 +81,7 @@ export default class Reporter {
   private addListeners() {
     // 接收插件上报事件, 将任务插入调度器
     this.$hook?.on('report', ({ data, runTime }: ReportParams) => {
-      console.log('report 事件触发, 数据:', data);
+      logger.log('report 事件触发, 数据:', data);
       const pkgData = this.builder?.build(data);
       if (!pkgData) return;
       if (!runTime || runTime === 'delay') {

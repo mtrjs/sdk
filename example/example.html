@@ -9,13 +9,13 @@
   <body>
     <script src="../index.min.js"></script>
     <script>
-      var { default: Monitor, Browser } = window.monitor;
-      const monitor = new Monitor();
-      monitor.init({
+      var { default: Reporter, Browser } = window.monitor;
+      const reporter = new Reporter({
         appId: '',
         dsn: '',
         plugins: [new Browser()],
       });
+      reporter.init();
     </script>
   </body>
 </html>

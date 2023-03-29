@@ -1,5 +1,6 @@
 import Reporter from './index';
 import { IData, Send } from './type';
+import logger from '../lib/logger';
 
 export interface Config {
   // 储存任务满 maxPool 则消费
@@ -72,9 +73,9 @@ export class Schedule {
    */
   send(data: IData[]) {
     this.client.$hook.emit('send', (send: Send) => {
-      console.log('send 任务发送: 数据', { data });
+      logger.log('send 任务发送: 数据', { data });
       return send(data).then((res) => {
-        console.log('send 成功!');
+        logger.log('send 成功!');
         return res;
       });
     });
