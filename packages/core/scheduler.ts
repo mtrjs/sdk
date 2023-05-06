@@ -1,10 +1,10 @@
-import Reporter from './index';
-import { IData, Send } from './type';
+import Reporter from './reporter';
+import { IData, Sender } from './type';
 import logger from '../lib/logger';
 
 export interface Config {
-  // 储存任务满 maxPool 则消费
-  maxPool: number;
+  // 储存任务满 maxTasks 则消费
+  maxTasks: number;
   client: Reporter;
 }
 
@@ -23,13 +23,27 @@ let id = 0;
  */
 export class Schedule {
   tasks: Task[];
-  maxPool: number;
+
+  maxTasks: number;
+
   client: Reporter;
+
+  // 周期上报时间间隔
+  cycleTime: number;
+
+  // 去重缓冲 map
+  cache: Map<string, Task>;
 
   constructor(config: Config) {
     this.client = config.client;
     this.tasks = [];
-    this.maxPool = config.maxPool;
+    this.maxTasks = config.maxTasks;
+    this.cycleTime = 8;
+    this.cache = new Map();
+
+    setInterval(() => {
+      this.consume(true);
+    }, this.cycleTime * 1000);
   }
 
   /**
@@ -39,15 +53,21 @@ export class Schedule {
    * @return {*}
    * @memberof Schedule
    */
-  async consumer(clear?: boolean) {
-    if (!clear && this.tasks.length < this.maxPool) return;
-    const runTasks = this.tasks.slice(0, this.maxPool);
-    this.tasks = this.tasks.slice(this.maxPool);
+  async consume(clear?: boolean) {
+    if (!clear && this.tasks.length < this.maxTasks) return;
+    const runTasks = this.tasks.slice(0, this.maxTasks);
+    this.tasks = this.tasks.slice(this.maxTasks);
+    runTasks.forEach(({ data }) => {
+      const { hash } = data;
+      if (hash) this.cache.delete(hash);
+    });
     const data = runTasks.map(({ data }) => data);
+
+    if (!data.length) return;
     try {
       await this.send(data);
       setTimeout(() => {
-        this.consumer();
+        this.consume();
       }, 1000);
     } catch (error) {
       // this.tasks.push(...runTasks);
@@ -62,9 +82,19 @@ export class Schedule {
    */
   push(data: IData) {
     const task = { id: ++id, data };
+    const { hash } = data;
+    if (hash) {
+      const cacheTask = this.cache.get(hash);
+      if (cacheTask) {
+        cacheTask.data.count = (cacheTask.data.count || 1) + 1;
+        return;
+      }
+      this.cache.set(hash, task);
+    }
     this.tasks.push(task);
-    this.consumer();
+    this.consume();
   }
+
   /**
    * 向插件发送 send 事件
    *
@@ -72,10 +102,10 @@ export class Schedule {
    * @memberof Schedule
    */
   send(data: IData[]) {
-    this.client.$hook.emit('send', (send: Send) => {
-      logger.log('send 任务发送: 数据', { data });
+    this.client.$hook.emit('send', (send: Sender) => {
+      logger.info('send 任务发送: 数据', data);
       return send(data).then((res) => {
-        logger.log('send 成功!');
+        logger.info('send 成功!');
         return res;
       });
     });
@@ -87,8 +117,9 @@ export class Schedule {
    * @memberof Schedule
    */
   async clear() {
-    this.consumer(true);
+    this.consume(true);
   }
+
   /**
    * 无需等待, 立即上报一个任务
    *

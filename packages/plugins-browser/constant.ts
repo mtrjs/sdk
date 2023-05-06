@@ -1,22 +1,18 @@
-/**
- * 上报类型
- *
- * @export
- * @enum {number}
- */
-export enum ReportType {
-  PERFORMANCE = '1',
-  RESOURCE = '2',
-  ERROR = '3',
-}
-
-export enum ErrorType {
+export enum ExceptionType {
   PROMISE,
   JS,
-  RESOURCE,
 }
 
 export enum RequestType {
   fetch,
   XHR,
+}
+
+export enum Eid {
+  'js-exception' = '1003',
+  'request-exception' = '1004',
+  'console-exception' = '1005',
+  'resource-exception' = '1006',
+  performance = '1000',
+  'runtime-performance' = '1007',
 }

@@ -5,6 +5,7 @@ specifiers:
   '@babel/plugin-transform-runtime': ^7.21.0
   '@babel/preset-env': ^7.20.2
   '@babel/preset-typescript': ^7.21.0
+  '@babel/runtime': ^7.21.0
   '@rollup/plugin-babel': ^6.0.3
   '@rollup/plugin-commonjs': ^24.0.1
   '@rollup/plugin-json': ^6.0.0
@@ -23,9 +24,12 @@ specifiers:
   rollup-plugin-ts: ^3.2.0
   tslib: ^2.5.0
   typescript: ^4.9.5
+  web-vitals: ^3.3.1
 
 dependencies:
+  '@babel/runtime': 7.21.0
   core-js: 3.29.1
+  web-vitals: 3.3.1
 
 devDependencies:
   '@babel/core': 7.21.0
@@ -46,7 +50,7 @@ devDependencies:
   rimraf: 4.1.2
   rollup: 3.17.3
   rollup-plugin-clear: 2.0.7
-  rollup-plugin-ts: 3.2.0_yjodd557l2ekl7zekkcb5csi5e
+  rollup-plugin-ts: 3.2.0_hurfx6yz5qqip5j4nureczd3vm
   tslib: 2.5.0
   typescript: 4.9.5
 
@@ -1251,7 +1255,6 @@ packages:
     engines: {node: '>=6.9.0'}
     dependencies:
       regenerator-runtime: 0.13.11
-    dev: true
 
   /@babel/template/7.20.7:
     resolution: {integrity: sha512-8SegXApWe6VoNw0r9JHpSteLKTpTiLZ4rMlGIm9JQ18KiCtyQiAMEazujAHrUS5flrcqYZa75ukev3P6QmUwUw==}
@@ -3255,7 +3258,6 @@ packages:
 
   /regenerator-runtime/0.13.11:
     resolution: {integrity: sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg==}
-    dev: true
 
   /regenerator-transform/0.15.1:
     resolution: {integrity: sha512-knzmNAcuyxV+gQCufkYcvOqX/qIIfHLv0u5x79kRxuGojfYVky1f15TzZEu2Avte8QGepvUNTnLskf8E6X6Vyg==}
@@ -3332,7 +3334,7 @@ packages:
       rimraf: 2.7.1
     dev: true
 
-  /rollup-plugin-ts/3.2.0_yjodd557l2ekl7zekkcb5csi5e:
+  /rollup-plugin-ts/3.2.0_hurfx6yz5qqip5j4nureczd3vm:
     resolution: {integrity: sha512-KkTLVifkUexEiAXS9VtSjDrjKr0TyusmNJpb2ZTAzI9VuPumSu4AktIaVNnwv70iUEitHwZtET7OAM+5n1u1tg==}
     engines: {node: '>=14.9.0', npm: '>=7.0.0', pnpm: '>=3.2.0', yarn: '>=1.13'}
     peerDependencies:
@@ -3365,6 +3367,7 @@ packages:
       '@babel/plugin-transform-runtime': 7.21.0_@babel+core@7.21.0
       '@babel/preset-env': 7.20.2_@babel+core@7.21.0
       '@babel/preset-typescript': 7.21.0_@babel+core@7.21.0
+      '@babel/runtime': 7.21.0
       '@rollup/pluginutils': 5.0.2_rollup@3.17.3
       '@wessberg/stringutil': 1.0.19
       ansi-colors: 4.1.3
@@ -3652,6 +3655,10 @@ packages:
     dependencies:
       makeerror: 1.0.12
     dev: true
+
+  /web-vitals/3.3.1:
+    resolution: {integrity: sha512-LTfY5GjcY3ngFzNsYFSYL+AmVmlWrzPTUxSMDis2rZbf+SzT7HH3NH4Y/l45XOlrAIunOBeURN9qtBHkRskAiA==}
+    dev: false
 
   /which/2.0.2:
     resolution: {integrity: sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==}

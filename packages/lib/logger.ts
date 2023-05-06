@@ -1,7 +1,7 @@
 class Logger {
   _log(level: Console, ...rest: any) {}
   log(...rest: Parameters<Console['log']>) {
-    logger.log(...rest);
+    console.log(...rest);
   }
   info(...rest: Parameters<Console['info']>) {
     console.info(...rest);

@@ -24,16 +24,23 @@ export default {
       plugins: [terser()],
       exports: 'named',
     },
+    {
+      file: 'dist/index.es.js',
+      name: 'monitor',
+      format: 'es',
+      plugins: [terser()],
+      sourcemap: false,
+    },
   ],
   plugins: [
-    ts(),
-    babel({ babelHelpers: 'bundled' }),
-    commonjs(),
-    nodeResolve(),
-    json(),
     clear({
       targets: ['dist'],
       watch: true, // default: false
     }),
+    json(),
+    ts(),
+    commonjs(),
+    nodeResolve(),
+    babel({ babelHelpers: 'bundled' }),
   ],
 };

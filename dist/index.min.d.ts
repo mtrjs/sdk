@@ -1,18 +1,21 @@
 interface IPlugin {
     name: string;
     apply(instance: Reporter): void;
-    send: Send;
+    send: Sender;
 }
-type Send = (data: IData[]) => Promise<boolean>;
+// sync: 是否是同步模式
+type Sender = (data: IData[], sync?: boolean) => Promise<boolean>;
 interface ReporterConfig {
     // 应用 ID
     appId: string;
+    // 上报环境
+    env: string;
     // 上报地址
     dsn: string;
     plugins?: IPlugin[];
     debug?: boolean;
     // 上报任务缓存数量, default: 10
-    maxPool?: number;
+    maxTasks?: number;
 }
 /**
  * 公共参数
@@ -21,8 +24,9 @@ interface ReporterConfig {
  */
 interface IBaseData extends IPlatformBaseData {
     // 应用 id
-    appId: string;
-    traceId: string;
+    app_id: string;
+    app_env: string;
+    trace_id: string;
     // 版本
     version?: string;
     // sdk 信息
@@ -31,6 +35,7 @@ interface IBaseData extends IPlatformBaseData {
     };
     // 时间戳
     t?: number;
+    count?: number;
 }
 interface IPlatformBaseData {
     ua?: string;
@@ -38,6 +43,7 @@ interface IPlatformBaseData {
 interface LData extends IPlatformBaseData {
     // 事件 id
     eid: string;
+    hash?: string;
     l: Record<string, any>;
 }
 type IData = IBaseData & LData;
@@ -50,6 +56,7 @@ interface ReportParams {
 }
 interface Config {
     appId: string;
+    env: string;
 }
 /**
  * 数据处理
@@ -63,20 +70,23 @@ declare class Builder {
     constructor(config: Config);
     build(data: LData): {
         eid: string;
+        hash?: string | undefined;
         l: Record<string, any>;
         ua?: string | undefined;
-        appId: string;
-        traceId: string;
+        app_id: string;
+        app_env: string;
+        trace_id: string;
         version?: string | undefined;
         sdk: {
             version: string;
         };
         t: number;
+        count?: number | undefined;
     };
 }
 interface Config$0 {
-    // 储存任务满 maxPool 则消费
-    maxPool: number;
+    // 储存任务满 maxTasks 则消费
+    maxTasks: number;
     client: Reporter;
 }
 interface Task {
@@ -91,8 +101,12 @@ interface Task {
  */
 declare class Schedule {
     tasks: Task[];
-    maxPool: number;
+    maxTasks: number;
     client: Reporter;
+    // 周期上报时间间隔
+    cycleTime: number;
+    // 去重缓冲 map
+    cache: Map<string, Task>;
     constructor(config: Config$0);
     /**
      * 任务消费
@@ -101,7 +115,7 @@ declare class Schedule {
      * @return {*}
      * @memberof Schedule
      */
-    consumer(clear?: boolean): Promise<void>;
+    consume(clear?: boolean): Promise<void>;
     /**
      *储存一个延时任务
      *
@@ -143,6 +157,10 @@ declare class Event {
     removeAllListener(type: string): void;
     removeListener(type: string, listener: Function): void;
 }
+declare module EventWrapper {
+    export { Event };
+}
+import EventEmitter = EventWrapper.Event;
 /**
  * Core 实例
  *
@@ -151,7 +169,7 @@ declare class Event {
  */
 declare class Reporter {
     // 事件中心
-    $hook: Event;
+    $hook: EventEmitter;
     // 实例配置
     config: ReporterConfig;
     // 数据包装器
@@ -184,8 +202,6 @@ declare class Reporter {
     getTasks(): Task[];
     getConfig(): ReporterConfig;
 }
-interface Options {
-}
 /**
  * 浏览器端插件
  *
@@ -193,14 +209,38 @@ interface Options {
  * @class Browser
  */
 declare class Browser implements IPlugin {
-    private options;
     name: string;
-    client: any;
-    constructor(options?: Options);
-    apply(client: any): void;
-    send(data: IData[]): Promise<boolean>;
+    client: Reporter;
+    apply(client: Reporter): void;
+    /**
+     * 接口上报数据
+     *
+     * @param {IData[]} data
+     * @param {boolean} [sync=false]
+     * @return {*}
+     * @memberof Browser
+     */
+    send(data: IData[], sync?: boolean): Promise<boolean>;
+    /**
+     * 内部使用的report方法, 用来注入一些插件内公共参数
+     *
+     * @param {ReportParams} body
+     * @memberof Browser
+     */
     report(body: ReportParams): void;
+    /**
+     * XHR劫持
+     *
+     * @return {*}
+     * @memberof Browser
+     */
     overrideXHR(): void;
+    /**
+     * fetch 劫持
+     *
+     * @return {*}
+     * @memberof Browser
+     */
     overrideFetch(): void;
     /**
      * Js 异常捕捉
@@ -223,5 +263,12 @@ declare class Browser implements IPlugin {
      * @memberof Browser
      */
     timing(): void;
+    hijackConsole(): void;
+    /**
+     * 运行时性能计算
+     *
+     * @memberof Browser
+     */
+    runTimePerformance(): void;
 }
 export { Reporter as default, Browser };

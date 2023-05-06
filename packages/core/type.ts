@@ -3,20 +3,23 @@ import Reporter from './reporter';
 export interface IPlugin {
   name: string;
   apply(instance: Reporter): void;
-  send: Send;
+  send: Sender;
 }
 
-export type Send = (data: IData[]) => Promise<boolean>;
+// sync: 是否是同步模式
+export type Sender = (data: IData[], sync?: boolean) => Promise<boolean>;
 
 export interface ReporterConfig {
   // 应用 ID
   appId: string;
+  // 上报环境
+  env: string;
   // 上报地址
   dsn: string;
   plugins?: IPlugin[];
   debug?: boolean;
   // 上报任务缓存数量, default: 10
-  maxPool?: number;
+  maxTasks?: number;
 }
 
 /**
@@ -26,8 +29,9 @@ export interface ReporterConfig {
  */
 export interface IBaseData extends IPlatformBaseData {
   // 应用 id
-  appId: string;
-  traceId: string;
+  app_id: string;
+  app_env: string;
+  trace_id: string;
   // 版本
   version?: string;
   // sdk 信息
@@ -36,6 +40,7 @@ export interface IBaseData extends IPlatformBaseData {
   };
   // 时间戳
   t?: number;
+  count?: number;
 }
 
 export interface IPlatformBaseData {
@@ -45,6 +50,7 @@ export interface IPlatformBaseData {
 export interface LData extends IPlatformBaseData {
   // 事件 id
   eid: string;
+  hash?: string;
   l: Record<string, any>;
 }
 

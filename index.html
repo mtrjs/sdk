@@ -7,12 +7,13 @@
     <title>Document</title>
   </head>
   <body>
-    <script src="../index.min.js"></script>
+    <h2>nihao</h2>
+    <script src="./dist/index.js"></script>
     <script>
-      var { default: Reporter, Browser } = window.monitor;
+      const { default: Reporter, Browser } = window.monitor;
       const reporter = new Reporter({
-        appId: '',
-        dsn: '',
+        appId: 'test',
+        dsn: 'http://127.0.0.1:3001',
         plugins: [new Browser()],
       });
       reporter.init();

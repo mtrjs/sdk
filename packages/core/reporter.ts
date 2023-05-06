@@ -1,7 +1,7 @@
 import { Builder } from './builder';
-import { Schedule } from './schedule';
+import { Schedule } from './scheduler';
 import { IPlugin, ReporterConfig, ReportParams } from './type';
-import Ev from '../lib/Event';
+import EventEmitter from '../lib/Event';
 import logger from '../lib/logger';
 
 function assertConfig(config: ReporterConfig) {
@@ -18,6 +18,8 @@ function assertConfig(config: ReporterConfig) {
   }
 }
 
+const internalPlugins: IPlugin[] = [];
+
 /**
  * Core 实例
  *
@@ -26,11 +28,14 @@ function assertConfig(config: ReporterConfig) {
  */
 export default class Reporter {
   // 事件中心
-  $hook!: Ev;
+  $hook!: EventEmitter;
+
   // 实例配置
   config!: ReporterConfig;
+
   // 数据包装器
   builder!: Builder;
+
   // 事件上报中心
   schedule!: Schedule;
 
@@ -40,16 +45,16 @@ export default class Reporter {
   }
 
   init() {
-    const { plugins = [], appId, maxPool = 10 } = this.config;
+    const { plugins = [], appId, maxTasks = 10, env } = this.config;
 
-    this.builder = new Builder({ appId });
+    this.builder = new Builder({ appId, env });
 
-    this.schedule = new Schedule({ maxPool, client: this });
+    this.schedule = new Schedule({ maxTasks, client: this });
 
-    this.$hook = new Ev();
+    this.$hook = new EventEmitter();
 
     // 插件注册
-    this.registerPlugins(plugins);
+    this.registerPlugins(internalPlugins.concat(plugins));
 
     // 事件注册
     this.addListeners();
@@ -58,6 +63,7 @@ export default class Reporter {
     this.$hook?.emit('init', {});
     logger.info('sdk init');
   }
+
   /**
    * 插件注册
    *
@@ -72,6 +78,7 @@ export default class Reporter {
       return plugin.apply(this);
     });
   }
+
   /**
    * 挂在事件
    *
@@ -81,12 +88,13 @@ export default class Reporter {
   private addListeners() {
     // 接收插件上报事件, 将任务插入调度器
     this.$hook?.on('report', ({ data, runTime }: ReportParams) => {
-      logger.log('report 事件触发, 数据:', data);
+      const _runTime = runTime || 'delay';
+      logger.info('report 事件触发, 数据:', { data, runTime: _runTime });
       const pkgData = this.builder?.build(data);
       if (!pkgData) return;
-      if (!runTime || runTime === 'delay') {
+      if (_runTime === 'delay') {
         this.schedule?.push(pkgData);
-      } else if (runTime === 'immediately') {
+      } else if (_runTime === 'immediately') {
         this.schedule?.immediate(pkgData);
       }
     });
@@ -94,7 +102,7 @@ export default class Reporter {
 
   getReportParams() {
     return {
-      url: this.config.dsn + '/v1/report',
+      url: `${this.config.dsn}/v1/report`,
       method: 'POST',
       headers: {},
     };

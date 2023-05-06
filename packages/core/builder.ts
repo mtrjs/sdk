@@ -1,16 +1,10 @@
-import pkg from '../../package.json';
 import { IBaseData, LData } from './type';
+import pkg from '../../package.json';
+import { guid } from '../lib/helper';
 
 interface Config {
   appId: string;
-}
-
-function guid() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0,
-      v = c == 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  env: string;
 }
 
 /**
@@ -21,16 +15,18 @@ function guid() {
  */
 export class Builder {
   baseData: IBaseData;
+
   cache: Map<string, string>;
 
   constructor(config: Config) {
-    const { appId } = config;
+    const { appId, env } = config;
     const traceId = guid();
     this.cache = new Map();
 
     this.baseData = {
-      appId,
-      traceId,
+      app_id: appId,
+      app_env: env,
+      trace_id: traceId,
       sdk: {
         version: pkg.version,
       },
