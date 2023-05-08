@@ -140,7 +140,7 @@
     }
 
     var name = "@mtrjs/sdk";
-    var version = "1.0.0";
+    var version = "1.0.1";
     var main = "dist/index.min.js";
     var scripts = {
     	build: "rollup -c --bundleConfigAsCjs",

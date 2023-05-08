@@ -1,6 +1,6 @@
 {
   "name": "@mtrjs/sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "dist/index.min.js",
   "scripts": {
     "build": "rollup -c --bundleConfigAsCjs",
