@@ -48,5 +48,8 @@
   "types": "./dist/index.min.d.ts",
   "directories": {
     "example": "example"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
