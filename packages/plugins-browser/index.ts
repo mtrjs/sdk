@@ -69,6 +69,7 @@ export class Browser implements IPlugin {
         l: {
           ...l,
           ua,
+          referrer: document.referrer,
           href: window.location.href,
         },
       },
