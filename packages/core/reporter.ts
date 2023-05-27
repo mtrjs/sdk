@@ -18,8 +18,6 @@ function assertConfig(config: ReporterConfig) {
   }
 }
 
-const internalPlugins: IPlugin[] = [];
-
 /**
  * Core 实例
  *
@@ -54,7 +52,7 @@ export default class Reporter {
     this.$hook = new EventEmitter();
 
     // 插件注册
-    this.registerPlugins(internalPlugins.concat(plugins));
+    this.registerPlugins(plugins);
 
     // 事件注册
     this.addListeners();
@@ -79,17 +77,10 @@ export default class Reporter {
     });
   }
 
-  /**
-   * 挂在事件
-   *
-   * @private
-   * @memberof Reporter
-   */
   private addListeners() {
     // 接收插件上报事件, 将任务插入调度器
     this.$hook?.on('report', ({ data, runTime }: ReportParams) => {
       const _runTime = runTime || 'delay';
-      logger.info('report 事件触发, 数据:', { data, runTime: _runTime });
       const pkgData = this.builder?.build(data);
       if (!pkgData) return;
       if (_runTime === 'delay') {

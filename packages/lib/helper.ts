@@ -1,16 +1,7 @@
-/**
- * 计算字符串 hash 值, djb2 算法
- *
- * @export
- * @param {string} s
- * @return {*}
- */
-export function getHash(s: string) {
-  let hash = 5381;
-  for (let i = 0; i < s.length; i++) {
-    hash = (hash * 33 + s.charCodeAt(i)) % 0x100000000;
-  }
-  return hash.toString(16);
+import { randomBytes } from 'crypto';
+
+export function randomString(n = 20) {
+  return randomBytes(n).toString('hex');
 }
 
 export function guid() {

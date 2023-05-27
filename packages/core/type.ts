@@ -50,7 +50,6 @@ export interface IPlatformBaseData {
 export interface LData extends IPlatformBaseData {
   // 事件 id
   eid: string;
-  hash?: string;
   l: Record<string, any>;
 }
 

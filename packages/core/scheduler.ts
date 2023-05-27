@@ -57,10 +57,6 @@ export class Schedule {
     if (!clear && this.tasks.length < this.maxTasks) return;
     const runTasks = this.tasks.slice(0, this.maxTasks);
     this.tasks = this.tasks.slice(this.maxTasks);
-    runTasks.forEach(({ data }) => {
-      const { hash } = data;
-      if (hash) this.cache.delete(hash);
-    });
     const data = runTasks.map(({ data }) => data);
 
     if (!data.length) return;
@@ -82,15 +78,6 @@ export class Schedule {
    */
   push(data: IData) {
     const task = { id: ++id, data };
-    const { hash } = data;
-    if (hash) {
-      const cacheTask = this.cache.get(hash);
-      if (cacheTask) {
-        cacheTask.data.count = (cacheTask.data.count || 1) + 1;
-        return;
-      }
-      this.cache.set(hash, task);
-    }
     this.tasks.push(task);
     this.consume();
   }
