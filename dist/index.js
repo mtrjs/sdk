@@ -129,171 +129,83 @@
         };
       }
     }
-    function __spreadArray(to, from, pack) {
-      if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
-        if (ar || !(i in from)) {
-          if (!ar) ar = Array.prototype.slice.call(from, 0, i);
-          ar[i] = from[i];
-        }
-      }
-      return to.concat(ar || Array.prototype.slice.call(from));
-    }
 
-    var name = "@mtrjs/sdk";
-    var version = "1.0.1";
-    var main = "dist/index.min.js";
-    var scripts = {
-    	build: "rollup -c --bundleConfigAsCjs",
-    	"build:watch": "rollup -c --bundleConfigAsCjs --watch"
-    };
-    var repository = {
-    	type: "git",
-    	url: "git+https://github.com/mtrjs/sdk.git"
-    };
-    var keywords = [
-    ];
-    var author = "";
-    var license = "ISC";
-    var bugs = {
-    	url: "https://github.com/mtrjs/sdk/issues"
-    };
-    var homepage = "https://github.com/mtrjs/sdk#readme";
-    var devDependencies = {
-    	"@babel/core": "^7.21.0",
-    	"@babel/plugin-transform-runtime": "^7.21.0",
-    	"@babel/preset-env": "^7.20.2",
-    	"@babel/preset-typescript": "^7.21.0",
-    	"@rollup/plugin-babel": "^6.0.3",
-    	"@rollup/plugin-commonjs": "^24.0.1",
-    	"@rollup/plugin-json": "^6.0.0",
-    	"@rollup/plugin-node-resolve": "^15.0.1",
-    	"@rollup/plugin-terser": "^0.4.0",
-    	"@rollup/plugin-typescript": "^11.0.0",
-    	"@types/node": "^18.14.2",
-    	"cross-env": "^7.0.3",
-    	emittery: "^1.0.1",
-    	jest: "^29.4.3",
-    	prettier: "^2.8.4",
-    	rimraf: "^4.1.2",
-    	rollup: "^3.17.3",
-    	"rollup-plugin-clear": "^2.0.7",
-    	"rollup-plugin-ts": "^3.2.0",
-    	tslib: "^2.5.0",
-    	typescript: "^4.9.5"
-    };
-    var dependencies = {
-    	"@babel/runtime": "^7.21.0",
-    	"core-js": "^3.29.1",
-    	"web-vitals": "^3.3.1"
-    };
-    var types = "./dist/index.min.d.ts";
-    var directories = {
-    	example: "example"
-    };
-    var pkg = {
-    	name: name,
-    	version: version,
-    	main: main,
-    	scripts: scripts,
-    	repository: repository,
-    	keywords: keywords,
-    	author: author,
-    	license: license,
-    	bugs: bugs,
-    	homepage: homepage,
-    	devDependencies: devDependencies,
-    	dependencies: dependencies,
-    	types: types,
-    	directories: directories
+    var Eid = {
+        jsException: 'jsException',
+        requestException: 'requestException',
+        resourceException: 'resourceException',
+        performance: 'performance',
+        performanceResource: 'performanceResource',
     };
 
-    /**
-     * 计算字符串 hash 值, djb2 算法
-     *
-     * @export
-     * @param {string} s
-     * @return {*}
-     */
-    function getHash(s) {
-        var hash = 5381;
-        for (var i = 0; i < s.length; i++) {
-            hash = (hash * 33 + s.charCodeAt(i)) % 0x100000000;
-        }
-        return hash.toString(16);
-    }
     function guid() {
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-            var r = (Math.random() * 16) | 0, v = c == 'x' ? r : (r & 0x3) | 0x8;
+            var r = (Math.random() * 16) | 0;
+            var v = c === 'x' ? r : (r & 0x3) | 0x8;
             return v.toString(16);
         });
     }
 
-    /**
-     * 数据处理
-     *
-     * @export
-     * @class Builder
-     */
-    var Builder = /** @class */ (function () {
-        function Builder(config) {
-            var appId = config.appId, env = config.env;
-            var traceId = guid();
-            this.cache = new Map();
-            this.baseData = {
-                app_id: appId,
-                app_env: env,
-                trace_id: traceId,
-                sdk: {
-                    version: pkg.version,
-                },
-            };
-        }
-        Builder.prototype.build = function (data) {
-            return _assign(_assign({ t: +new Date() }, this.baseData), data);
-        };
-        return Builder;
-    }());
-
-    var Logger = /** @class */ (function () {
-        function Logger() {
-        }
-        Logger.prototype._log = function (level) {
-        };
-        Logger.prototype.log = function () {
-            var rest = [];
-            for (var _i = 0; _i < arguments.length; _i++) {
-                rest[_i] = arguments[_i];
-            }
-            console.log.apply(console, rest);
-        };
-        Logger.prototype.info = function () {
-            var rest = [];
-            for (var _i = 0; _i < arguments.length; _i++) {
-                rest[_i] = arguments[_i];
-            }
-            console.info.apply(console, rest);
-        };
-        return Logger;
-    }());
-    var logger = new Logger();
-
     var id = 0;
+    var Storage = /** @class */ (function () {
+        function Storage(props) {
+            this.tasks = [];
+            this.maxTasks = props.maxTasks;
+        }
+        /**
+         * 往缓冲区 push 任务
+         *
+         * @param {LData} data
+         * @return {*}
+         * @memberof Storage
+         */
+        Storage.prototype.push = function (data) {
+            if (Array.isArray(data)) {
+                var tasks = data.map(function (d) { return ({ id: ++id, data: d, count: 1 }); });
+                this.tasks = this.tasks.concat(tasks);
+            }
+            else {
+                var task = { id: ++id, data: data, count: 1 };
+                this.tasks.push(task);
+            }
+            if (this.tasks.length >= this.maxTasks)
+                return true;
+            return false;
+        };
+        /**
+         * 取出缓冲区的任务
+         *
+         * @param {number} n
+         * @return {*}
+         * @memberof Storage
+         */
+        Storage.prototype.pop = function (n) {
+            var tasks = this.tasks.slice(0, n);
+            this.tasks = this.tasks.slice(n);
+            return tasks;
+        };
+        Storage.prototype.getSize = function () {
+            return this.tasks.length;
+        };
+        return Storage;
+    }());
+
     /**
      * 任务中心
      *
      * @export
      * @class Schedule
      */
-    var Schedule = /** @class */ (function () {
-        function Schedule(config) {
+    var Scheduler = /** @class */ (function () {
+        function Scheduler(config) {
             var _this = this;
-            this.client = config.client;
-            this.tasks = [];
-            this.maxTasks = config.maxTasks;
-            this.cycleTime = 8;
-            this.cache = new Map();
+            var client = config.client, maxTasks = config.maxTasks, storage = config.storage;
+            this.client = client;
+            this.maxTasks = maxTasks;
+            this.storage = storage;
+            this.cycleTime = 5;
             setInterval(function () {
-                _this.consume(true);
+                _this.consume();
             }, this.cycleTime * 1000);
         }
         /**
@@ -303,94 +215,168 @@
          * @return {*}
          * @memberof Schedule
          */
-        Schedule.prototype.consume = function (clear) {
+        Scheduler.prototype.consume = function () {
+            var _a, _b;
             return __awaiter(this, void 0, void 0, function () {
-                var runTasks, data;
+                var tasks, data, error_1;
                 var _this = this;
-                return __generator(this, function (_a) {
-                    switch (_a.label) {
+                return __generator(this, function (_c) {
+                    switch (_c.label) {
                         case 0:
-                            if (!clear && this.tasks.length < this.maxTasks)
-                                return [2 /*return*/];
-                            runTasks = this.tasks.slice(0, this.maxTasks);
-                            this.tasks = this.tasks.slice(this.maxTasks);
-                            runTasks.forEach(function (_a) {
-                                var data = _a.data;
-                                var hash = data.hash;
-                                if (hash)
-                                    _this.cache.delete(hash);
-                            });
-                            data = runTasks.map(function (_a) {
+                            tasks = this.storage.pop(this.maxTasks);
+                            data = tasks.map(function (_a) {
                                 var data = _a.data;
                                 return data;
                             });
                             if (!data.length)
                                 return [2 /*return*/];
-                            _a.label = 1;
+                            _c.label = 1;
                         case 1:
-                            _a.trys.push([1, 3, , 4]);
-                            return [4 /*yield*/, this.send(data)];
+                            _c.trys.push([1, 3, , 4]);
+                            return [4 /*yield*/, this.client.send(_assign(_assign({}, this.client.baseData), { list: data }), {
+                                    url: "".concat((_b = (_a = this.client) === null || _a === void 0 ? void 0 : _a.config) === null || _b === void 0 ? void 0 : _b.dsn, "/report"),
+                                })];
                         case 2:
-                            _a.sent();
+                            _c.sent();
                             setTimeout(function () {
                                 _this.consume();
-                            }, 1000);
+                            }, 100);
                             return [3 /*break*/, 4];
                         case 3:
-                            _a.sent();
+                            error_1 = _c.sent();
+                            console.log(error_1);
                             return [3 /*break*/, 4];
                         case 4: return [2 /*return*/];
                     }
                 });
             });
         };
-        /**
-         *储存一个延时任务
-         *
-         * @param {IData} data
-         * @memberof Schedule
-         */
-        Schedule.prototype.push = function (data) {
-            var task = { id: ++id, data: data };
-            var hash = data.hash;
-            if (hash) {
-                var cacheTask = this.cache.get(hash);
-                if (cacheTask) {
-                    cacheTask.data.count = (cacheTask.data.count || 1) + 1;
-                    return;
-                }
-                this.cache.set(hash, task);
+        return Scheduler;
+    }());
+
+    var getNavigationEntryFromPerformanceTiming = function () {
+        var timing = performance.timing;
+        var type = performance.navigation.type;
+        var navigationEntry = {
+            entryType: 'navigation',
+            startTime: 0,
+            type: type === 2 ? 'back_forward' : type === 1 ? 'reload' : 'navigate',
+        };
+        for (var key in timing) {
+            if (key !== 'navigationStart' && key !== 'toJSON') {
+                navigationEntry[key] = Math.max(timing[key] - timing.navigationStart, 0);
             }
-            this.tasks.push(task);
-            this.consume();
+        }
+        return navigationEntry;
+    };
+    var defaultMaxTasks = 20;
+    function assertConfig(config) {
+        if (!config) {
+            console.info('缺少 SDK 配置信息');
+            return false;
+        }
+        if (!config.dsn) {
+            console.info('缺少 SDK dns 配置信息');
+            return false;
+        }
+        if (!config.appId) {
+            console.info('缺少 appId 应用 ID');
+            return false;
+        }
+        if (!config.env) {
+            console.info('缺少 应用环境');
+            return false;
+        }
+        return true;
+    }
+    var Reporter = /** @class */ (function () {
+        function Reporter(config) {
+            this.config = {};
+            this.reportedEids = new Set();
+            if (config)
+                this.config = _assign(_assign({}, this.config), config);
+            if (!Reporter.instance)
+                Reporter.instance = this;
+            console.log('实例化成功');
+            return Reporter.instance;
+        }
+        /**
+         * 初始化方法
+         *
+         * @return {*}
+         * @memberof Reporter
+         */
+        Reporter.prototype.init = function () {
+            console.log('init called');
+            if (!this.config) {
+                console.log('无配置信息，初始化失败');
+                return false;
+            }
+            var _a = this.config, appId = _a.appId, env = _a.env, contentId = _a.contentId, contentName = _a.contentName, userId = _a.userId, userName = _a.userName, _b = _a.maxTasks, maxTasks = _b === void 0 ? defaultMaxTasks : _b;
+            this.config.dsn = this.config.dsn || '/cus/content/octopus';
+            var traceId = guid();
+            if (!assertConfig(this.config)) {
+                return false;
+            }
+            this.baseData = {
+                appId: appId,
+                appEnv: env,
+                traceId: traceId,
+                cid: contentId,
+                cname: contentName,
+                uid: userId,
+                uname: userName,
+                ua: navigator.userAgent,
+                href: window.location.href,
+            };
+            this.storage = new Storage({ maxTasks: maxTasks });
+            this.scheduler = new Scheduler({
+                maxTasks: maxTasks,
+                storage: this.storage,
+                client: this,
+            });
+            this.timing();
+            this.listenError();
+            this.overrideFetch();
+            this.overrideXHR();
+            console.log('global:sdk:octopus-sdk: 初始化 成功');
+            return true;
         };
         /**
-         * 向插件发送 send 事件
+         * 实例暴露给外部自定义上报的方法
          *
-         * @param {IData[]} data
-         * @memberof Schedule
+         * @param {ReportParams} { data, runTime }
+         * @return {*}
+         * @memberof Reporter
          */
-        Schedule.prototype.send = function (data) {
-            this.client.$hook.emit('send', function (send) {
-                logger.info('send 任务发送: 数据', data);
-                return send(data).then(function (res) {
-                    logger.info('send 成功!');
-                    return res;
-                });
+        Reporter.prototype.report = function (_a) {
+            var _this_1 = this;
+            var data = _a.data, runTime = _a.runTime;
+            var _runTime = runTime || 'delay';
+            if (!data)
+                return;
+            var pkgData = [];
+            if (Array.isArray(data)) {
+                if (!data.length)
+                    return;
+                pkgData = data;
+            }
+            else {
+                pkgData = [data];
+            }
+            pkgData.forEach(function (o) {
+                return [Eid.jsException, Eid.performance, Eid.requestException, Eid.resourceException].includes(o.eid) &&
+                    _this_1.reportedEids.add(o.eid);
             });
-        };
-        /**
-         * 清空任务
-         *
-         * @memberof Schedule
-         */
-        Schedule.prototype.clear = function () {
-            return __awaiter(this, void 0, void 0, function () {
-                return __generator(this, function (_a) {
-                    this.consume(true);
-                    return [2 /*return*/];
-                });
-            });
+            pkgData = pkgData.map(function (o) { return (_assign(_assign({}, o), { t: Math.floor(+new Date() / 1000) })); });
+            if (_runTime === 'delay') {
+                var overflow = this.storage.push(pkgData);
+                if (overflow)
+                    this.scheduler.consume();
+            }
+            else if (_runTime === 'immediately') {
+                this.immediate(pkgData);
+            }
         };
         /**
          * 无需等待, 立即上报一个任务
@@ -399,574 +385,71 @@
          * @return {*}
          * @memberof Schedule
          */
-        Schedule.prototype.immediate = function (data) {
-            return this.send([data]);
-        };
-        return Schedule;
-    }());
-
-    var Event = /** @class */ (function () {
-        function Event() {
-            this.event = new Map();
-            this.maxListener = 100;
-        }
-        Event.prototype.on = function (type, fn) {
-            var list = this.event.get(type) || [];
-            if (typeof fn === 'function') {
-                this.event.set(type, __spreadArray(__spreadArray([], list, true), [fn], false));
-            }
-        };
-        Event.prototype.once = function (type, fn) {
-            var _this = this;
-            function newFn() {
-                var args = [];
-                for (var _i = 0; _i < arguments.length; _i++) {
-                    args[_i] = arguments[_i];
-                }
-                fn.apply(void 0, args);
-                _this.removeListener(type, newFn);
-            }
-            this.on(type, newFn);
-        };
-        Event.prototype.emit = function (type, params) {
-            var listeners = this.event.get(type) || [];
-            listeners.forEach(function (fn) { return fn(params); });
-        };
-        Event.prototype.setMaxListeners = function (count) {
-            this.maxListener = count;
-        };
-        Event.prototype.listeners = function (type) {
-            return this.event.get(type) || [];
-        };
-        Event.prototype.removeAllListener = function (type) {
-            this.event.set(type, []);
-        };
-        Event.prototype.removeListener = function (type, listener) {
-            var listeners = this.event.get(type) || [];
-            listeners = listeners.filter(function (fn) { return listener !== fn; });
-            this.event.set(type, listeners);
-        };
-        return Event;
-    }());
-
-    function assertConfig(config) {
-        if (!config) {
-            throw new Error('缺少 SDK 配置信息');
-        }
-        if (!config.dsn) {
-            throw new Error('缺少 SDK dns 配置信息');
-        }
-        if (!config.appId) {
-            throw new Error('缺少 appId 应用 ID');
-        }
-    }
-    var internalPlugins = [];
-    /**
-     * Core 实例
-     *
-     * @export
-     * @class Reporter
-     */
-    var Reporter = /** @class */ (function () {
-        function Reporter(config) {
-            assertConfig(config);
-            this.config = config;
-        }
-        Reporter.prototype.init = function () {
-            var _a;
-            var _b = this.config, _c = _b.plugins, plugins = _c === void 0 ? [] : _c, appId = _b.appId, _d = _b.maxTasks, maxTasks = _d === void 0 ? 10 : _d, env = _b.env;
-            this.builder = new Builder({ appId: appId, env: env });
-            this.schedule = new Schedule({ maxTasks: maxTasks, client: this });
-            this.$hook = new Event();
-            // 插件注册
-            this.registerPlugins(internalPlugins.concat(plugins));
-            // 事件注册
-            this.addListeners();
-            // 唤起 init 事件
-            (_a = this.$hook) === null || _a === void 0 ? void 0 : _a.emit('init', {});
-            logger.info('sdk init');
-        };
-        /**
-         * 插件注册
-         *
-         * @private
-         * @param {IPlugin[]} plugins
-         * @return {*}
-         * @memberof Reporter
-         */
-        Reporter.prototype.registerPlugins = function (plugins) {
-            var _this = this;
-            if (!Array.isArray(plugins))
-                return;
-            plugins.map(function (plugin) {
-                return plugin.apply(_this);
+        Reporter.prototype.immediate = function (data) {
+            this.send(_assign(_assign({}, this.baseData), { list: data }), {
+                url: "".concat(this.config.dsn, "/report"),
             });
         };
         /**
-         * 挂在事件
-         *
-         * @private
-         * @memberof Reporter
+         * 更新配置,同时更新已上报数据
+         * @param config
          */
-        Reporter.prototype.addListeners = function () {
-            var _this = this;
-            var _a;
-            // 接收插件上报事件, 将任务插入调度器
-            (_a = this.$hook) === null || _a === void 0 ? void 0 : _a.on('report', function (_a) {
-                var _b, _c, _d;
-                var data = _a.data, runTime = _a.runTime;
-                var _runTime = runTime || 'delay';
-                logger.info('report 事件触发, 数据:', { data: data, runTime: _runTime });
-                var pkgData = (_b = _this.builder) === null || _b === void 0 ? void 0 : _b.build(data);
-                if (!pkgData)
-                    return;
-                if (_runTime === 'delay') {
-                    (_c = _this.schedule) === null || _c === void 0 ? void 0 : _c.push(pkgData);
-                }
-                else if (_runTime === 'immediately') {
-                    (_d = _this.schedule) === null || _d === void 0 ? void 0 : _d.immediate(pkgData);
-                }
-            });
-        };
-        Reporter.prototype.getReportParams = function () {
-            return {
-                url: "".concat(this.config.dsn, "/v1/report"),
-                method: 'POST',
-                headers: {},
-            };
-        };
-        Reporter.prototype.getTasks = function () {
-            return this.schedule.tasks;
-        };
-        Reporter.prototype.getConfig = function () {
-            return this.config;
-        };
-        return Reporter;
-    }());
-
-    var ExceptionType;
-    (function (ExceptionType) {
-        ExceptionType[ExceptionType["PROMISE"] = 0] = "PROMISE";
-        ExceptionType[ExceptionType["JS"] = 1] = "JS";
-    })(ExceptionType || (ExceptionType = {}));
-    var RequestType;
-    (function (RequestType) {
-        RequestType[RequestType["fetch"] = 0] = "fetch";
-        RequestType[RequestType["XHR"] = 1] = "XHR";
-    })(RequestType || (RequestType = {}));
-    var Eid;
-    (function (Eid) {
-        Eid["js-exception"] = "1003";
-        Eid["request-exception"] = "1004";
-        Eid["console-exception"] = "1005";
-        Eid["resource-exception"] = "1006";
-        Eid["performance"] = "1000";
-        Eid["runtime-performance"] = "1007";
-    })(Eid || (Eid = {}));
-
-    var e,
-      n,
-      t,
-      r,
-      a = -1,
-      o = function o(e) {
-        addEventListener("pageshow", function (n) {
-          n.persisted && (a = n.timeStamp, e(n));
-        }, !0);
-      },
-      c = function c() {
-        return window.performance && performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
-      },
-      u = function u() {
-        var e = c();
-        return e && e.activationStart || 0;
-      },
-      f = function f(e, n) {
-        var t = c(),
-          r = "navigate";
-        return a >= 0 ? r = "back-forward-cache" : t && (r = document.prerendering || u() > 0 ? "prerender" : document.wasDiscarded ? "restore" : t.type.replace(/_/g, "-")), {
-          name: e,
-          value: void 0 === n ? -1 : n,
-          rating: "good",
-          delta: 0,
-          entries: [],
-          id: "v3-".concat(Date.now(), "-").concat(Math.floor(8999999999999 * Math.random()) + 1e12),
-          navigationType: r
-        };
-      },
-      s = function s(e, n, t) {
-        try {
-          if (PerformanceObserver.supportedEntryTypes.includes(e)) {
-            var r = new PerformanceObserver(function (e) {
-              Promise.resolve().then(function () {
-                n(e.getEntries());
-              });
-            });
-            return r.observe(Object.assign({
-              type: e,
-              buffered: !0
-            }, t || {})), r;
-          }
-        } catch (e) {}
-      },
-      d = function d(e, n, t, r) {
-        var i, a;
-        return function (o) {
-          n.value >= 0 && (o || r) && ((a = n.value - (i || 0)) || void 0 === i) && (i = n.value, n.delta = a, n.rating = function (e, n) {
-            return e > n[1] ? "poor" : e > n[0] ? "needs-improvement" : "good";
-          }(n.value, t), e(n));
-        };
-      },
-      l = function l(e) {
-        requestAnimationFrame(function () {
-          return requestAnimationFrame(function () {
-            return e();
-          });
-        });
-      },
-      p = function p(e) {
-        var n = function n(_n) {
-          "pagehide" !== _n.type && "hidden" !== document.visibilityState || e(_n);
-        };
-        addEventListener("visibilitychange", n, !0), addEventListener("pagehide", n, !0);
-      },
-      v = function v(e) {
-        var n = !1;
-        return function (t) {
-          n || (e(t), n = !0);
-        };
-      },
-      m = -1,
-      h = function h() {
-        return "hidden" !== document.visibilityState || document.prerendering ? 1 / 0 : 0;
-      },
-      g = function g(e) {
-        "hidden" === document.visibilityState && m > -1 && (m = "visibilitychange" === e.type ? e.timeStamp : 0, T());
-      },
-      y = function y() {
-        addEventListener("visibilitychange", g, !0), addEventListener("prerenderingchange", g, !0);
-      },
-      T = function T() {
-        removeEventListener("visibilitychange", g, !0), removeEventListener("prerenderingchange", g, !0);
-      },
-      E = function E() {
-        return m < 0 && (m = h(), y(), o(function () {
-          setTimeout(function () {
-            m = h(), y();
-          }, 0);
-        })), {
-          get firstHiddenTime() {
-            return m;
-          }
-        };
-      },
-      C = function C(e) {
-        document.prerendering ? addEventListener("prerenderingchange", function () {
-          return e();
-        }, !0) : e();
-      },
-      L = [1800, 3e3],
-      b = function b(e, n) {
-        n = n || {}, C(function () {
-          var t,
-            r = E(),
-            i = f("FCP"),
-            a = s("paint", function (e) {
-              e.forEach(function (e) {
-                "first-contentful-paint" === e.name && (a.disconnect(), e.startTime < r.firstHiddenTime && (i.value = Math.max(e.startTime - u(), 0), i.entries.push(e), t(!0)));
-              });
-            });
-          a && (t = d(e, i, L, n.reportAllChanges), o(function (r) {
-            i = f("FCP"), t = d(e, i, L, n.reportAllChanges), l(function () {
-              i.value = performance.now() - r.timeStamp, t(!0);
-            });
-          }));
-        });
-      },
-      w = [.1, .25],
-      S = function S(e, n) {
-        n = n || {}, b(v(function () {
-          var t,
-            r = f("CLS", 0),
-            i = 0,
-            a = [],
-            c = function c(e) {
-              e.forEach(function (e) {
-                if (!e.hadRecentInput) {
-                  var n = a[0],
-                    t = a[a.length - 1];
-                  i && e.startTime - t.startTime < 1e3 && e.startTime - n.startTime < 5e3 ? (i += e.value, a.push(e)) : (i = e.value, a = [e]);
-                }
-              }), i > r.value && (r.value = i, r.entries = a, t());
-            },
-            u = s("layout-shift", c);
-          u && (t = d(e, r, w, n.reportAllChanges), p(function () {
-            c(u.takeRecords()), t(!0);
-          }), o(function () {
-            i = 0, r = f("CLS", 0), t = d(e, r, w, n.reportAllChanges), l(function () {
-              return t();
-            });
-          }), setTimeout(t, 0));
-        }));
-      },
-      A = {
-        passive: !0,
-        capture: !0
-      },
-      I = new Date(),
-      P = function P(r, i) {
-        e || (e = i, n = r, t = new Date(), k(removeEventListener), F());
-      },
-      F = function F() {
-        if (n >= 0 && n < t - I) {
-          var i = {
-            entryType: "first-input",
-            name: e.type,
-            target: e.target,
-            cancelable: e.cancelable,
-            startTime: e.timeStamp,
-            processingStart: e.timeStamp + n
-          };
-          r.forEach(function (e) {
-            e(i);
-          }), r = [];
-        }
-      },
-      M = function M(e) {
-        if (e.cancelable) {
-          var n = (e.timeStamp > 1e12 ? new Date() : performance.now()) - e.timeStamp;
-          "pointerdown" == e.type ? function (e, n) {
-            var t = function t() {
-                P(e, n), i();
-              },
-              r = function r() {
-                i();
-              },
-              i = function i() {
-                removeEventListener("pointerup", t, A), removeEventListener("pointercancel", r, A);
-              };
-            addEventListener("pointerup", t, A), addEventListener("pointercancel", r, A);
-          }(n, e) : P(n, e);
-        }
-      },
-      k = function k(e) {
-        ["mousedown", "keydown", "touchstart", "pointerdown"].forEach(function (n) {
-          return e(n, M, A);
-        });
-      },
-      D = [100, 300],
-      x = function x(t, i) {
-        i = i || {}, C(function () {
-          var a,
-            c = E(),
-            u = f("FID"),
-            l = function l(e) {
-              e.startTime < c.firstHiddenTime && (u.value = e.processingStart - e.startTime, u.entries.push(e), a(!0));
-            },
-            m = function m(e) {
-              e.forEach(l);
-            },
-            h = s("first-input", m);
-          a = d(t, u, D, i.reportAllChanges), h && p(v(function () {
-            m(h.takeRecords()), h.disconnect();
-          })), h && o(function () {
-            var o;
-            u = f("FID"), a = d(t, u, D, i.reportAllChanges), r = [], n = -1, e = null, k(addEventListener), o = l, r.push(o), F();
-          });
-        });
-      },
-      U = [2500, 4e3],
-      V = {},
-      W = function W(e, n) {
-        n = n || {}, C(function () {
-          var t,
-            r = E(),
-            i = f("LCP"),
-            a = function a(e) {
-              var n = e[e.length - 1];
-              n && n.startTime < r.firstHiddenTime && (i.value = Math.max(n.startTime - u(), 0), i.entries = [n], t());
-            },
-            c = s("largest-contentful-paint", a);
-          if (c) {
-            t = d(e, i, U, n.reportAllChanges);
-            var m = v(function () {
-              V[i.id] || (a(c.takeRecords()), c.disconnect(), V[i.id] = !0, t(!0));
-            });
-            ["keydown", "click"].forEach(function (e) {
-              addEventListener(e, m, !0);
-            }), p(m), o(function (r) {
-              i = f("LCP"), t = d(e, i, U, n.reportAllChanges), l(function () {
-                i.value = performance.now() - r.timeStamp, V[i.id] = !0, t(!0);
-              });
-            });
-          }
-        });
-      },
-      X = [800, 1800],
-      Y = function e(n) {
-        document.prerendering ? C(function () {
-          return e(n);
-        }) : "complete" !== document.readyState ? addEventListener("load", function () {
-          return e(n);
-        }, !0) : setTimeout(n, 0);
-      },
-      Z = function Z(e, n) {
-        n = n || {};
-        var t = f("TTFB"),
-          r = d(e, t, X, n.reportAllChanges);
-        Y(function () {
-          var i = c();
-          if (i) {
-            var a = i.responseStart;
-            if (a <= 0 || a > performance.now()) return;
-            t.value = Math.max(a - u(), 0), t.entries = [i], r(!0), o(function () {
-              t = f("TTFB", 0), (r = d(e, t, X, n.reportAllChanges))(!0);
-            });
-          }
-        });
-      };
-
-    var indicators = [
-        'navigationStart',
-        'unloadEventStart',
-        'unloadEventEnd',
-        'navigationStart',
-        'redirectStart',
-        'redirectEnd',
-        'fetchStart',
-        'domainLookupStart',
-        'domainLookupEnd',
-        'connectStart',
-        'secureConnectionStart',
-        'connectEnd',
-        'requestStart',
-        'responseStart',
-        'responseEnd',
-        'domLoading',
-        'domInteractive',
-        'domContentLoadedEventEnd',
-        'domContentLoadedEventStart',
-        'domComplete',
-        'loadEventStart',
-        'loadEventEnd',
-    ];
-    function formatTiming(timing) {
-        var t = {
-            redirectCount: timing.redirectCount,
-        };
-        indicators.forEach(function (key) {
-            t[key] = Number((timing[key] || 0).toFixed(2));
-        });
-        return t;
-    }
-    /**
-     * 往上报数据中注入 hash 值
-     *
-     * @param {LData} data
-     * @return {*}
-     */
-    function injectHash(data) {
-        var eid = data.eid, l = data.l;
-        var hash;
-        if (eid === Eid['js-exception']) {
-            var _a = l.name, name_1 = _a === void 0 ? '' : _a, _b = l.stack, stack = _b === void 0 ? '' : _b, _c = l.message, message = _c === void 0 ? '' : _c, _d = l.colno, colno = _d === void 0 ? '' : _d, _e = l.filename, filename = _e === void 0 ? '' : _e, _f = l.lineno, lineno = _f === void 0 ? '' : _f;
-            hash = getHash(name_1 + stack + message + colno + lineno + filename);
-        }
-        else if (eid === Eid['resource-exception']) {
-            var src = l.src;
-            hash = getHash(src);
-        }
-        return hash;
-    }
-    /**
-     * 浏览器端插件
-     *
-     * @export
-     * @class Browser
-     */
-    var Browser = /** @class */ (function () {
-        function Browser() {
-            this.name = 'Browser';
-        }
-        Browser.prototype.apply = function (client) {
-            var _this_1 = this;
-            this.client = client;
-            if (!window && !document)
+        Reporter.prototype.updateConfig = function (config) {
+            var contentId = config.contentId, contentName = config.contentName, userId = config.userId, userName = config.userName;
+            var params = {};
+            if (contentId) {
+                params.cid = contentId;
+            }
+            if (contentName)
+                params.cname = contentName;
+            if (userId)
+                params.uid = userId;
+            if (userName)
+                params.uname = userName;
+            this.baseData = _assign(_assign({}, this.baseData), params);
+            if (!this.reportedEids.size)
                 return;
-            client.$hook.on('init', function () {
-                _this_1.timing();
-                _this_1.listenError();
-                _this_1.promiseError();
-                _this_1.overrideFetch();
-                _this_1.overrideXHR();
-                _this_1.hijackConsole();
-                // this.runTimePerformance();
-            });
-            client.$hook.on('send', function (report) {
-                requestIdleCallback(function () { return report(_this_1.send.bind(_this_1)); });
-            });
-            // 特殊处理, 刷新或者离开页面前保证缓存的数据能够上报
-            document.addEventListener('visibilitychange', function () {
-                var tasks = client.getTasks();
-                if (!tasks.length)
-                    return;
-                var data = tasks.map(function (_a) {
-                    var data = _a.data;
-                    return data;
-                });
-                _this_1.send(data, true);
-            });
+            this.send(_assign({ appId: this.baseData.appId, traceId: this.baseData.traceId, eids: Array.from(this.reportedEids) }, params), { url: "".concat(this.config.dsn, "/report/update") });
         };
         /**
          * 接口上报数据
          *
-         * @param {IData[]} data
+         * @param {any} data
          * @param {boolean} [sync=false]
          * @return {*}
          * @memberof Browser
          */
-        Browser.prototype.send = function (data, sync) {
+        Reporter.prototype.send = function (data, config, sync) {
             if (sync === void 0) { sync = false; }
-            var _a = this.client.getReportParams(), url = _a.url, method = _a.method;
-            var formData = new FormData();
-            formData.append('data', JSON.stringify(data));
+            var _a = (config || {}).url, url = _a === void 0 ? '/' : _a;
+            var body = JSON.stringify(data);
             if (typeof navigator.sendBeacon === 'function') {
-                return Promise.resolve(navigator.sendBeacon(url, formData));
+                return Promise.resolve(navigator.sendBeacon(url, body));
             }
             if (typeof fetch === 'function') {
-                return fetch(url, { method: method, keepalive: true }).then(function () {
+                return fetch(url, {
+                    method: 'POST',
+                    keepalive: true,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: body,
+                }).then(function () {
                     return true;
                 });
             }
             return new Promise(function (r, j) {
                 var XHR = new XMLHttpRequest();
+                XHR.setRequestHeader('content-type', 'application/json');
                 XHR.addEventListener('load', function () {
                     r(true);
                 });
                 XHR.addEventListener('error', function () {
                     j();
                 });
-                XHR.open(method, url, !sync);
-                XHR.send(formData);
+                XHR.open('POST', url, !sync);
+                XHR.send(body);
             });
-        };
-        /**
-         * 内部使用的report方法, 用来注入一些插件内公共参数
-         *
-         * @param {ReportParams} body
-         * @memberof Browser
-         */
-        Browser.prototype.report = function (body) {
-            var _a;
-            var data = body.data;
-            var hash = injectHash(data);
-            var eid = data.eid, l = data.l;
-            var ua = navigator.userAgent;
-            (_a = this.client) === null || _a === void 0 ? void 0 : _a.$hook.emit('report', _assign(_assign({}, body), { data: {
-                    eid: eid,
-                    hash: hash,
-                    l: _assign(_assign({}, l), { ua: ua, href: window.location.href }),
-                } }));
         };
         /**
          * XHR劫持
@@ -974,35 +457,21 @@
          * @return {*}
          * @memberof Browser
          */
-        Browser.prototype.overrideXHR = function () {
+        Reporter.prototype.overrideXHR = function () {
             if (!XMLHttpRequest)
                 return;
             var _this = this;
             var _open = XMLHttpRequest.prototype.open;
             var _send = XMLHttpRequest.prototype.send;
-            var _setRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
-            XMLHttpRequest.prototype.setRequestHeader = function () {
-                var _a, _b;
-                var args = [];
-                for (var _i = 0; _i < arguments.length; _i++) {
-                    args[_i] = arguments[_i];
-                }
-                // 获取最后一个请求信息对象
-                var headers = (_b = (_a = this.reporterCollect) === null || _a === void 0 ? void 0 : _a.headers) !== null && _b !== void 0 ? _b : {};
-                var _c = args || [], header = _c[0], value = _c[1];
-                headers[header] = value;
-                this.reporterCollect = _assign(_assign({}, this.reporterCollect), { headers: headers });
-                // 调用原始 setRequestHeader 方法
-                _setRequestHeader.apply(this, args);
-            };
+            // @ts-ignore
             XMLHttpRequest.prototype.open = function () {
                 var args = [];
                 for (var _i = 0; _i < arguments.length; _i++) {
                     args[_i] = arguments[_i];
                 }
                 var _a = args, method = _a[0], url = _a[1];
-                var startTime = Date.now();
-                this.reporterCollect = _assign(_assign({}, this.reporterCollect), { method: method, url: typeof url === 'string' ? url : url.toString(), startTime: startTime, type: RequestType.XHR });
+                var startTime = Math.floor(Date.now() / 1000);
+                this.reporterCollect = _assign(_assign({}, this.reporterCollect), { method: method, url: typeof url === 'string' ? url : url.toString(), startTime: startTime });
                 _open.apply(this, args);
             };
             XMLHttpRequest.prototype.send = function () {
@@ -1011,18 +480,17 @@
                 for (var _i = 0; _i < arguments.length; _i++) {
                     args[_i] = arguments[_i];
                 }
-                var body = (args || [])[0];
                 this.addEventListener('loadend', function () {
-                    var endTime = Date.now();
+                    var endTime = Math.floor(Date.now() / 1000);
                     var _a = _this_1, status = _a.status, statusText = _a.statusText;
                     if (status > 200 || !status) {
-                        _this_1.reporterCollect = _assign(_assign({}, _this_1.reporterCollect), { endTime: endTime, status: String(status), statusText: statusText, body: body });
-                        var headers = _this_1.reporterCollect.headers;
+                        _this_1.reporterCollect = _assign(_assign({}, _this_1.reporterCollect), { endTime: endTime, status: String(status), statusText: statusText });
+                        var url = _this_1.reporterCollect.url;
+                        if (url.toString().indexOf(_this.config.dsn) !== -1) {
+                            return;
+                        }
                         _this.report({
-                            data: {
-                                eid: Eid['request-exception'],
-                                l: _assign(_assign({}, _this_1.reporterCollect), { headers: JSON.stringify(headers) }),
-                            },
+                            data: _assign({ eid: Eid.requestException }, _this_1.reporterCollect),
                         });
                     }
                 });
@@ -1035,7 +503,7 @@
          * @return {*}
          * @memberof Browser
          */
-        Browser.prototype.overrideFetch = function () {
+        Reporter.prototype.overrideFetch = function () {
             if (typeof window.fetch !== 'function') {
                 return;
             }
@@ -1046,7 +514,7 @@
                 for (var _i = 0; _i < arguments.length; _i++) {
                     args[_i] = arguments[_i];
                 }
-                var startTime = Date.now();
+                var startTime = Math.floor(Date.now() / 1000);
                 var url = args[0];
                 var config = args[1];
                 var _a = (config || {}).method, method = _a === void 0 ? 'GET' : _a;
@@ -1054,35 +522,34 @@
                     url: url,
                     startTime: startTime,
                     method: method,
-                    type: RequestType.fetch,
+                    type: 'fetch',
                 };
+                if (url.toString().indexOf(_this.config.dsn) !== -1)
+                    return originFetch.apply(window, args);
                 return originFetch
                     .apply(window, args)
                     .then(function (result) {
                     var status = result.status, statusText = result.statusText;
                     if (status && status > 300) {
-                        var endTime = Date.now();
+                        var endTime = Math.floor(Date.now() / 1000);
                         Object.assign(reportData, {
                             status: String(status),
                             statusText: statusText,
                             endTime: endTime,
                         });
                         _this.report({
-                            data: { eid: Eid['request-exception'], l: reportData },
+                            data: _assign({ eid: Eid.requestException }, reportData),
                         });
                     }
                     return result;
                 })
                     .catch(function (error) {
                     var endTime = Date.now();
-                    var name = error.name, message = error.message, stack = error.stack;
-                    Object.assign(reportData, { name: name, message: message, stack: stack });
+                    var name = error.name, message = error.message;
+                    Object.assign(reportData, { name: name, message: message });
                     reportData.endTime = endTime;
                     _this.report({
-                        data: {
-                            eid: Eid['request-exception'],
-                            l: reportData,
-                        },
+                        data: _assign({ eid: Eid.requestException }, reportData),
                     });
                     return error;
                 });
@@ -1094,7 +561,7 @@
          * @param {Reporter} client
          * @memberof Browser
          */
-        Browser.prototype.listenError = function () {
+        Reporter.prototype.listenError = function () {
             var _this_1 = this;
             window.addEventListener('error', function (e) {
                 var _a;
@@ -1103,15 +570,13 @@
                 if (type === 'error' && filename && colno && lineno) {
                     _this_1.report({
                         data: {
-                            eid: Eid['js-exception'],
-                            l: {
-                                name: message,
-                                colno: colno,
-                                message: error === null || error === void 0 ? void 0 : error.message,
-                                filename: filename,
-                                lineno: lineno,
-                                stack: error === null || error === void 0 ? void 0 : error.stack,
-                            },
+                            eid: Eid.jsException,
+                            name: message,
+                            colno: colno,
+                            message: error === null || error === void 0 ? void 0 : error.message,
+                            filename: filename,
+                            lineno: lineno,
+                            stack: error === null || error === void 0 ? void 0 : error.stack,
                         },
                     });
                 }
@@ -1120,10 +585,8 @@
                     if (type === 'error' && src) {
                         _this_1.report({
                             data: {
-                                eid: Eid['resource-exception'],
-                                l: {
-                                    src: src,
-                                },
+                                eid: Eid.resourceException,
+                                src: src,
                             },
                         });
                     }
@@ -1131,230 +594,191 @@
             }, true);
         };
         /**
-         * Promise 错误捕捉
+         * 性能计算入口
+         * @returns
+         */
+        Reporter.prototype.timing = function () {
+            if (!PerformanceObserver) {
+                console.error('系统版本过低，无法采集性能数据');
+                return;
+            }
+            this.navigationTiming();
+            this.resourceTiming();
+        };
+        /**
+         * 首屏性能数据采集
          *
          * @param {Reporter} client
          * @memberof Browser
          */
-        Browser.prototype.promiseError = function () {
+        Reporter.prototype.navigationTiming = function () {
             var _this_1 = this;
-            window.addEventListener('unhandledrejection', function (e) {
-                var reason = e.reason;
-                var reportData = {
-                    message: '',
-                    stack: '',
-                    name: '',
-                };
-                if (reason instanceof Error) {
-                    var name_2 = reason.name, stack = reason.stack, message = reason.message;
-                    reportData.message = message;
-                    reportData.stack = stack || '';
-                    reportData.name = name_2;
+            var supportTypes = PerformanceObserver.supportedEntryTypes;
+            var getNavigation = function () {
+                if (supportTypes.includes('navigation')) {
+                    var entries = performance.getEntriesByType('navigation') || [];
+                    var navigation = entries[0];
+                    if (navigation)
+                        return navigation;
+                }
+                return getNavigationEntryFromPerformanceTiming();
+            };
+            var fcpP = new Promise(function (r) {
+                if (supportTypes.includes('paint')) {
+                    var observer = new PerformanceObserver(function (list) {
+                        list.getEntries().forEach(function (entry) {
+                            if (entry.name === 'first-contentful-paint') {
+                                r(entry.startTime);
+                            }
+                        });
+                    });
+                    observer.observe({ type: 'paint', buffered: true });
                 }
                 else {
-                    reportData.message = reason;
-                    reportData.name = reason;
+                    r(null);
                 }
-                _this_1.report({
-                    data: {
-                        eid: Eid['js-exception'],
-                        l: _assign({ type: ExceptionType.PROMISE }, reportData),
-                    },
+            });
+            var lcpP = new Promise(function (r) {
+                if (supportTypes.includes('largest-contentful-paint')) {
+                    var observer = new PerformanceObserver(function (list) {
+                        var entries = list.getEntries();
+                        var lastEntry = entries[entries.length - 1];
+                        r(lastEntry.startTime);
+                    });
+                    observer.observe({
+                        type: 'largest-contentful-paint',
+                        buffered: true,
+                    });
+                }
+                else {
+                    r(null);
+                }
+            });
+            var loadP = new Promise(function (r) {
+                window.addEventListener('load', r);
+            });
+            Promise.all([fcpP, lcpP, loadP]).then(function (_a) {
+                var _b;
+                var fcp = _a[0], lcp = _a[1];
+                var navigation = getNavigation();
+                var cts = navigation.connectStart, cte = navigation.connectEnd, dls = navigation.domainLookupStart, dle = navigation.domainLookupEnd, fetchStart = navigation.fetchStart, lee = navigation.loadEventEnd, les = navigation.loadEventStart, entryType = navigation.entryType, initiatorType = navigation.initiatorType, domComplete = navigation.domComplete, domInteractive = navigation.domInteractive, rqs = navigation.requestStart, rsps = navigation.responseStart, rspe = navigation.responseEnd, name = navigation.name, decodedBodySize = navigation.decodedBodySize, encodedBodySize = navigation.encodedBodySize, nextHopProtocol = navigation.nextHopProtocol, domContentLoadedEventEnd = navigation.domContentLoadedEventEnd, domContentLoadedEventStart = navigation.domContentLoadedEventStart, duration = navigation.duration, responseStart = navigation.responseStart;
+                var ttfb = responseStart - fetchStart;
+                if (!fcp && domContentLoadedEventEnd) {
+                    fcp = domContentLoadedEventEnd;
+                }
+                if (!lcp) {
+                    lcp = domInteractive || domComplete || fcp;
+                }
+                var reportData = {
+                    cte: cte,
+                    cts: cts,
+                    dls: dls,
+                    dle: dle,
+                    et: entryType,
+                    it: initiatorType,
+                    fst: fetchStart,
+                    lee: lee,
+                    les: les,
+                    dcle: domContentLoadedEventEnd,
+                    dcls: domContentLoadedEventStart,
+                    domComplete: domComplete,
+                    domInteractive: domInteractive,
+                    rqs: rqs,
+                    rsps: rsps,
+                    rspe: rspe,
+                    name: name,
+                    dbs: decodedBodySize,
+                    ebs: encodedBodySize,
+                    nhp: nextHopProtocol,
+                    lcp: lcp,
+                    fcp: fcp,
+                    ttfb: ttfb,
+                    du: duration,
+                    ntype: (_b = performance.navigation) === null || _b === void 0 ? void 0 : _b.type,
+                };
+                Object.keys(reportData).forEach(function (key) {
+                    if (typeof reportData[key] === 'number') {
+                        reportData[key] = Math.round(reportData[key]);
+                    }
                 });
+                _this_1.report({
+                    runTime: 'immediately',
+                    data: _assign({ eid: Eid.performance }, reportData),
+                });
+                console.log('首屏性能数据已上报');
             });
         };
         /**
-         * 性能数据采集
+         * 资源性能数据
          *
-         * @param {Reporter} client
-         * @memberof Browser
+         * @memberof Reporter
          */
-        Browser.prototype.timing = function () {
-            var _this_1 = this;
-            // v2
-            if (PerformanceObserver) {
-                var observeTiming_1 = {
-                    fcp: 0,
-                    lcp: 0,
-                    cls: null,
-                    ttfb: 0,
-                };
-                var navigationP = new Promise(function (r) {
-                    var perfObserver = function (entries) {
-                        entries.getEntries().forEach(function (entry) {
-                            var entryType = entry.entryType;
-                            if (entryType === 'navigation') {
-                                var t = entry.toJSON();
-                                r(t);
+        Reporter.prototype.resourceTiming = function () {
+            var _this = this;
+            var supportTypes = PerformanceObserver.supportedEntryTypes;
+            if (supportTypes.includes('resource')) {
+                window.addEventListener('load', function () {
+                    var performanceResource = performance.getEntriesByType('resource');
+                    var set = new Set();
+                    // 过滤重复数据
+                    var tikPerformanceResource = performanceResource.reduce(function (acc, cur) {
+                        var name = cur.name, duration = cur.duration, initiatorType = cur.initiatorType, fetchStart = cur.fetchStart, nextHopProtocol = cur.nextHopProtocol, decodedBodySize = cur.decodedBodySize, encodedBodySize = cur.encodedBodySize, connectStart = cur.connectStart, connectEnd = cur.connectEnd, domainLookupEnd = cur.domainLookupEnd, domainLookupStart = cur.domainLookupStart, entryType = cur.entryType, requestStart = cur.requestStart, responseEnd = cur.responseEnd, responseStart = cur.responseStart;
+                        if (set.has(name))
+                            return acc;
+                        var obj = {
+                            name: name,
+                            du: duration,
+                            et: entryType,
+                            it: initiatorType,
+                            fst: fetchStart,
+                            nhp: nextHopProtocol,
+                            dbs: decodedBodySize,
+                            ebs: encodedBodySize,
+                            cts: connectStart,
+                            cte: connectEnd,
+                            dle: domainLookupEnd,
+                            dls: domainLookupStart,
+                            rqs: requestStart,
+                            rspe: responseEnd,
+                            rsps: responseStart,
+                            eid: Eid.performanceResource,
+                        };
+                        Object.keys(obj).forEach(function (key) {
+                            if (typeof obj[key] === 'number') {
+                                obj[key] = Math.round(obj[key]);
                             }
                         });
-                    };
-                    var observer = new PerformanceObserver(perfObserver);
-                    observer.observe({ entryTypes: ['navigation'] });
-                });
-                var loadPromiseUnLock_1 = function () { };
-                var loadPromise = new Promise(function (r) {
-                    loadPromiseUnLock_1 = r;
-                });
-                W(function (metric) {
-                    observeTiming_1.lcp = metric.value;
-                }, {
-                    reportAllChanges: true,
-                });
-                var fcpP = new Promise(function (r) {
-                    b(function (metric) {
-                        observeTiming_1.fcp = metric.value;
-                        r();
-                    });
-                });
-                S(function (metric) {
-                    observeTiming_1.cls = metric.value;
-                }, { reportAllChanges: true });
-                var fid_1;
-                x(function (metric) {
-                    fid_1 = metric.value;
-                });
-                var ttfbP = new Promise(function (r) {
-                    Z(function (metric) {
-                        observeTiming_1.ttfb = metric.value;
-                        r();
-                    });
-                });
-                setTimeout(function () {
-                    loadPromiseUnLock_1();
-                }, 12000);
-                window.addEventListener('load', function () {
-                    loadPromiseUnLock_1();
-                });
-                Promise.all([navigationP, loadPromise, fcpP, ttfbP]).then(function (_a) {
-                    var navigation = _a[0];
-                    navigation = formatTiming(navigation);
-                    var lcp = observeTiming_1.lcp, fcp = observeTiming_1.fcp, ttfb = observeTiming_1.ttfb, cls = observeTiming_1.cls;
-                    _this_1.report({
-                        runTime: 'immediately',
-                        data: {
-                            eid: Eid.performance,
-                            l: _assign(_assign({}, navigation), { lcp: lcp && Number(lcp.toFixed(2)), fcp: fcp && Number(fcp.toFixed(2)), fid: fid_1 && Number(fid_1.toFixed(2)), cls: cls && Number(cls.toFixed(2)), ttfb: ttfb && Number(ttfb.toFixed(2)) }),
-                        },
-                    });
+                        acc.push(obj);
+                        set.add(name);
+                        return acc;
+                    }, []);
+                    var tasks = tikPerformanceResource;
+                    while (tasks.length) {
+                        _this.report({
+                            runTime: 'immediately',
+                            data: tasks.slice(0, 30),
+                        });
+                        tasks = tasks.slice(30);
+                    }
+                    console.log('资源性能数据已上报');
                 });
             }
             else {
-                window.addEventListener('load', function () {
-                    var _a = performance.timing, navigationStart = _a.navigationStart, unloadEventStart = _a.unloadEventStart;
-                    var redirectCount = performance.navigation.redirectCount;
-                    var startAt = Math.min(navigationStart, unloadEventStart) || 0;
-                    var originTiming = _assign(_assign({}, performance.timing), performance.navigation);
-                    var timing = {
-                        redirectCount: redirectCount,
-                    };
-                    indicators.forEach(function (key, index) {
-                        if (originTiming[key] > 0) {
-                            originTiming[key] -= startAt;
-                        }
-                        else {
-                            originTiming[key] = index === 0 ? 0 : originTiming[indicators[index - 1]];
-                        }
-                        timing[key] = originTiming[key];
-                    });
-                    _this_1.report({
-                        runTime: 'immediately',
-                        data: { eid: Eid.performance, l: timing },
-                    });
-                });
+                console.error('系统版本过低,无法采集资源性能数据');
             }
         };
-        Browser.prototype.hijackConsole = function () {
-            var _this = this;
-            var _err = console.error;
-            console.error = function () {
-                var args = [];
-                for (var _i = 0; _i < arguments.length; _i++) {
-                    args[_i] = arguments[_i];
-                }
-                var messages = '';
-                try {
-                    messages = JSON.stringify(args.map(function (arg) {
-                        if (typeof arg === 'string')
-                            return arg;
-                        if (arg instanceof Error)
-                            return arg.message;
-                        return String(arg);
-                    }));
-                }
-                catch (error) {
-                    /* empty */
-                }
-                _this.report({
-                    data: {
-                        eid: Eid['console-exception'],
-                        l: {
-                            messages: messages,
-                            type: 'error',
-                        },
-                    },
-                });
-                _err.apply(this, args);
-            };
-        };
-        /**
-         * 运行时性能计算
-         *
-         * @memberof Browser
-         */
-        Browser.prototype.runTimePerformance = function () {
-            var _this_1 = this;
-            var fpsStore = [];
-            var memoryStore = [];
-            var calFps = function () {
-                var lastTime = 0;
-                var frameCount = 0;
-                var _calFps = function (currentTime) {
-                    if (lastTime === 0) {
-                        lastTime = currentTime;
-                    }
-                    frameCount++;
-                    if (currentTime - lastTime >= 1000) {
-                        var fps = frameCount;
-                        frameCount = 0;
-                        lastTime = currentTime;
-                        fpsStore.push(fps);
-                    }
-                    requestAnimationFrame(_calFps);
-                };
-                requestAnimationFrame(_calFps);
-            };
-            var calMemory = function () {
-                setInterval(function () {
-                    var memory = performance === null || performance === void 0 ? void 0 : performance.memory;
-                    memory && memoryStore.push(memory);
-                }, 1000);
-            };
-            window.addEventListener('load', function () {
-                calFps();
-                calMemory();
-                setInterval(function () {
-                    if (!fpsStore.length)
-                        return;
-                    console.log(memoryStore);
-                    var fps = fpsStore.reduce(function (acc, cur) { return acc + cur; }, 0) / fpsStore.length;
-                    fpsStore = [];
-                    memoryStore = [];
-                    _this_1.report({
-                        data: {
-                            eid: Eid['runtime-performance'],
-                            l: {
-                                fps: fps,
-                            },
-                        },
-                    });
-                }, 8000);
-            });
-        };
-        return Browser;
+        return Reporter;
     }());
 
-    exports.Browser = Browser;
+    /*
+     * 出口文件, 导出 Reporter
+     *
+     * @Author: 夏洁琼
+     * @Date: 2023-03-29 11:01:29
+     *
+     * Copyright © 2014-2023 Rabbitpre.com. All Rights Reserved.
+     */
+
     exports.default = Reporter;
 
     Object.defineProperty(exports, '__esModule', { value: true });

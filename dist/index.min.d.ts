@@ -1,97 +1,86 @@
-interface IPlugin {
-    name: string;
-    apply(instance: Reporter): void;
-    send: Sender;
-}
-// sync: 是否是同步模式
-type Sender = (data: IData[], sync?: boolean) => Promise<boolean>;
 interface ReporterConfig {
     // 应用 ID
     appId: string;
     // 上报环境
     env: string;
-    // 上报地址
+    // 上报服务端地址
     dsn: string;
-    plugins?: IPlugin[];
-    debug?: boolean;
-    // 上报任务缓存数量, default: 10
+    // 上报任务缓存数量, default: 20
     maxTasks?: number;
+    // 作品 ID
+    contentId?: string;
+    // 作品名称
+    contentName?: string;
+    // 用户ID
+    userId?: string;
+    // 用户昵称
+    userName?: string;
 }
 /**
  * 公共参数
  *
  * @interface IBaseData
  */
-interface IBaseData extends IPlatformBaseData {
+interface IBaseData {
     // 应用 id
-    app_id: string;
-    app_env: string;
-    trace_id: string;
-    // 版本
-    version?: string;
-    // sdk 信息
-    sdk: {
-        version: string;
-    };
-    // 时间戳
-    t?: number;
-    count?: number;
-}
-interface IPlatformBaseData {
+    appId: string;
+    appEnv: string;
+    cid?: string;
+    cname?: string;
+    traceId: string;
     ua?: string;
+    href?: string;
+    uid?: string;
+    uname?: string;
 }
-interface LData extends IPlatformBaseData {
+interface LData {
     // 事件 id
     eid: string;
     hash?: string;
-    l: Record<string, any>;
+    t?: number;
+    [k: string]: any;
 }
-type IData = IBaseData & LData;
 // delay: 任务缓存, immediately: 立即执行
 type RunTime = "delay" | "immediately";
 interface ReportParams {
-    data: LData;
+    data: LData | LData[];
     // 执行时机
     runTime?: RunTime;
 }
-interface Config {
-    appId: string;
-    env: string;
-}
-/**
- * 数据处理
- *
- * @export
- * @class Builder
- */
-declare class Builder {
-    baseData: IBaseData;
-    cache: Map<string, string>;
-    constructor(config: Config);
-    build(data: LData): {
-        eid: string;
-        hash?: string | undefined;
-        l: Record<string, any>;
-        ua?: string | undefined;
-        app_id: string;
-        app_env: string;
-        trace_id: string;
-        version?: string | undefined;
-        sdk: {
-            version: string;
-        };
-        t: number;
-        count?: number | undefined;
-    };
-}
-interface Config$0 {
-    // 储存任务满 maxTasks 则消费
-    maxTasks: number;
-    client: Reporter;
-}
 interface Task {
     id: number;
-    data: IData;
+    data: LData;
+    count: number;
+}
+declare class Storage {
+    tasks: Task[];
+    maxTasks: number;
+    constructor(props: {
+        maxTasks: number;
+    });
+    /**
+     * 往缓冲区 push 任务
+     *
+     * @param {LData} data
+     * @return {*}
+     * @memberof Storage
+     */
+    push(data: LData | LData[]): boolean;
+    /**
+     * 取出缓冲区的任务
+     *
+     * @param {number} n
+     * @return {*}
+     * @memberof Storage
+     */
+    pop(n: number): Task[];
+    getSize(): number;
+}
+interface Config {
+    // 每次消费任务个数上限
+    maxTasks: number;
+    client: Reporter;
+    storage: Storage;
 }
 /**
  * 任务中心
@@ -99,15 +88,13 @@ interface Task {
  * @export
  * @class Schedule
  */
-declare class Schedule {
-    tasks: Task[];
+declare class Scheduler {
     maxTasks: number;
     client: Reporter;
+    storage: Storage;
     // 周期上报时间间隔
     cycleTime: number;
-    // 去重缓冲 map
-    cache: Map<string, Task>;
-    constructor(config: Config$0);
+    constructor(config: Config);
     /**
      * 任务消费
      *
@@ -115,27 +102,32 @@ declare class Schedule {
      * @return {*}
      * @memberof Schedule
      */
-    consume(clear?: boolean): Promise<void>;
+    consume(): Promise<void>;
+}
+declare class Reporter {
+    static instance: Reporter;
+    config: ReporterConfig;
+    baseData: IBaseData;
+    // 数据缓冲区
+    storage: Storage;
+    scheduler: Scheduler;
+    reportedEids: Set<string>;
+    constructor(config: ReporterConfig);
     /**
-     *储存一个延时任务
+     * 初始化方法
      *
-     * @param {IData} data
-     * @memberof Schedule
+     * @return {*}
+     * @memberof Reporter
      */
-    push(data: IData): void;
+    init(): boolean;
     /**
-     * 向插件发送 send 事件
+     * 实例暴露给外部自定义上报的方法
      *
-     * @param {IData[]} data
-     * @memberof Schedule
+     * @param {ReportParams} { data, runTime }
+     * @return {*}
+     * @memberof Reporter
      */
-    send(data: IData[]): void;
-    /**
-     * 清空任务
-     *
-     * @memberof Schedule
-     */
-    clear(): Promise<void>;
+    report({ data, runTime }: ReportParams): void;
     /**
      * 无需等待, 立即上报一个任务
      *
@@ -143,98 +135,35 @@ declare class Schedule {
      * @return {*}
      * @memberof Schedule
      */
-    immediate(data: IData): void;
-}
-declare class Event {
-    event: Map<string, any>;
-    maxListener: number;
-    constructor();
-    on(type: string, fn: Function): void;
-    once(type: string, fn: Function): void;
-    emit<T>(type: string, params: T): void;
-    setMaxListeners(count: number): void;
-    listeners(type: string): any;
-    removeAllListener(type: string): void;
-    removeListener(type: string, listener: Function): void;
-}
-declare module EventWrapper {
-    export { Event };
-}
-import EventEmitter = EventWrapper.Event;
-/**
- * Core 实例
- *
- * @export
- * @class Reporter
- */
-declare class Reporter {
-    // 事件中心
-    $hook: EventEmitter;
-    // 实例配置
-    config: ReporterConfig;
-    // 数据包装器
-    builder: Builder;
-    // 事件上报中心
-    schedule: Schedule;
-    constructor(config: ReporterConfig);
-    init(): void;
+    private immediate;
     /**
-     * 插件注册
-     *
-     * @private
-     * @param {IPlugin[]} plugins
-     * @return {*}
-     * @memberof Reporter
+     * 更新配置,同时更新已上报数据
+     * @param config
      */
-    private registerPlugins;
-    /**
-     * 挂在事件
-     *
-     * @private
-     * @memberof Reporter
-     */
-    private addListeners;
-    getReportParams(): {
-        url: string;
-        method: string;
-        headers: {};
-    };
-    getTasks(): Task[];
-    getConfig(): ReporterConfig;
-}
-/**
- * 浏览器端插件
- *
- * @export
- * @class Browser
- */
-declare class Browser implements IPlugin {
-    name: string;
-    client: Reporter;
-    apply(client: Reporter): void;
+    updateConfig(config: {
+        contentId?: string;
+        contentName?: string;
+        userId?: string;
+        userName?: string;
+    }): void;
     /**
      * 接口上报数据
      *
-     * @param {IData[]} data
+     * @param {any} data
      * @param {boolean} [sync=false]
      * @return {*}
      * @memberof Browser
      */
-    send(data: IData[], sync?: boolean): Promise<boolean>;
-    /**
-     * 内部使用的report方法, 用来注入一些插件内公共参数
-     *
-     * @param {ReportParams} body
-     * @memberof Browser
-     */
-    report(body: ReportParams): void;
+    send(data: any, config?: {
+        url?: string;
+    }, sync?: boolean): Promise<boolean>;
     /**
      * XHR劫持
      *
      * @return {*}
      * @memberof Browser
      */
-    overrideXHR(): void;
+    private overrideXHR;
     /**
      * fetch 劫持
      *
@@ -250,25 +179,22 @@ declare class Browser implements IPlugin {
      */
     listenError(): void;
     /**
-     * Promise 错误捕捉
-     *
-     * @param {Reporter} client
-     * @memberof Browser
-     */
-    promiseError(): void;
-    /**
-     * 性能数据采集
-     *
-     * @param {Reporter} client
-     * @memberof Browser
+     * 性能计算入口
+     * @returns
      */
     timing(): void;
-    hijackConsole(): void;
     /**
-     * 运行时性能计算
+     * 首屏性能数据采集
      *
+     * @param {Reporter} client
      * @memberof Browser
      */
-    runTimePerformance(): void;
+    navigationTiming(): void;
+    /**
+     * 资源性能数据
+     *
+     * @memberof Reporter
+     */
+    resourceTiming(): void;
 }
-export { Reporter as default, Browser };
+export { Reporter as default };
