@@ -10,11 +10,12 @@
     <h2>nihao</h2>
     <script src="./dist/index.js"></script>
     <script>
-      const { default: Reporter, Browser } = window.monitor;
+      const { default: Reporter } = window.monitor;
+      console.log(window.monitor);
       const reporter = new Reporter({
-        appId: 'test',
-        dsn: 'http://127.0.0.1:3001',
-        plugins: [new Browser()],
+        appId: 'abc',
+        env: 'test',
+        dsn: 'http://127.0.0.1:3001/v1',
       });
       reporter.init();
     </script>

@@ -94,9 +94,9 @@ export default class Reporter {
       console.log('无配置信息，初始化失败');
       return false;
     }
-    const { appId, env, contentId, contentName, userId, userName, maxTasks = defaultMaxTasks } = this.config;
+    const { appId, env, userId, maxTasks = defaultMaxTasks } = this.config;
 
-    this.config.dsn = this.config.dsn || '/cus/content/octopus';
+    this.config.dsn = this.config.dsn;
 
     const traceId = guid();
 
@@ -108,10 +108,7 @@ export default class Reporter {
       appId,
       appEnv: env,
       traceId,
-      cid: contentId,
-      cname: contentName,
       uid: userId,
-      uname: userName,
       ua: navigator.userAgent,
       href: window.location.href,
     };
@@ -128,7 +125,7 @@ export default class Reporter {
     this.overrideFetch();
     this.overrideXHR();
 
-    console.log('global:sdk:octopus-sdk: 初始化 成功');
+    console.log('初始化 成功');
     return true;
   }
 
@@ -192,9 +189,9 @@ export default class Reporter {
     const { url = '/' } = config || {};
     const body = JSON.stringify(data);
 
-    if (typeof navigator.sendBeacon === 'function') {
-      return Promise.resolve(navigator.sendBeacon(url, body));
-    }
+    // if (typeof navigator.sendBeacon === 'function') {
+    //   return Promise.resolve(navigator.sendBeacon(url, body));
+    // }
 
     if (typeof fetch === 'function') {
       return fetch(url, {
@@ -451,20 +448,20 @@ export default class Reporter {
     Promise.all([fcpP, lcpP, loadP]).then(([fcp, lcp]) => {
       const navigation = getNavigation();
       const {
-        connectStart: cts,
-        connectEnd: cte,
-        domainLookupStart: dls,
-        domainLookupEnd: dle,
+        connectStart,
+        connectEnd,
+        domainLookupStart,
+        domainLookupEnd,
         fetchStart,
-        loadEventEnd: lee,
-        loadEventStart: les,
+        loadEventEnd,
+        loadEventStart,
         entryType,
         initiatorType,
         domComplete,
         domInteractive,
-        requestStart: rqs,
-        responseStart: rsps,
-        responseEnd: rspe,
+        requestStart,
+        responseStart,
+        responseEnd,
         name,
         decodedBodySize,
         encodedBodySize,
@@ -472,7 +469,6 @@ export default class Reporter {
         domContentLoadedEventEnd,
         domContentLoadedEventStart,
         duration,
-        responseStart,
       } = navigation;
 
       const ttfb = responseStart - fetchStart;
@@ -486,30 +482,29 @@ export default class Reporter {
       }
 
       const reportData: Record<string, any> = {
-        cte,
-        cts,
-        dls,
-        dle,
-        et: entryType,
-        it: initiatorType,
-        fst: fetchStart,
-        lee,
-        les,
-        dcle: domContentLoadedEventEnd,
-        dcls: domContentLoadedEventStart,
+        connectStart,
+        connectEnd,
+        domainLookupStart,
+        domainLookupEnd,
+        fetchStart,
+        loadEventEnd,
+        loadEventStart,
+        responseEnd,
+        entryType,
+        initiatorType,
+        domContentLoadedEventEnd,
+        domContentLoadedEventStart,
         domComplete,
         domInteractive,
-        rqs,
-        rsps,
-        rspe,
+        requestStart,
         name,
-        dbs: decodedBodySize,
-        ebs: encodedBodySize,
-        nhp: nextHopProtocol,
+        decodedBodySize,
+        encodedBodySize,
+        nextHopProtocol,
         lcp,
         fcp,
         ttfb,
-        du: duration,
+        duration,
         ntype: performance.navigation?.type,
       };
 
