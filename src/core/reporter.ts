@@ -1,7 +1,7 @@
 /* eslint-disable class-methods-use-this */
 import { IBaseData, LData, ReportParams, ReporterConfig, NavigationTimingPolyfillEntry } from './type';
 import { Eid } from './constant';
-import { guid } from '../utils/helper';
+import { formatDate, guid } from '../utils/helper';
 import Storage from './storage';
 import Scheduler from './scheduler';
 
@@ -30,7 +30,6 @@ interface IError extends Event {
   message?: string;
   error?: Error;
   name?: string;
-
   target: (EventTarget & { src?: string }) | null;
 }
 
@@ -152,7 +151,7 @@ export default class Reporter {
         this.reportedEids.add(o.eid),
     );
 
-    pkgData = pkgData.map((o) => ({ ...o, t: Math.floor(+new Date() / 1000) }));
+    pkgData = pkgData.map((o) => ({ ...o, t: formatDate(new Date()) }));
     if (_runTime === 'delay') {
       const overflow = this.storage.push(pkgData);
       if (overflow) this.scheduler.consume();
@@ -235,7 +234,7 @@ export default class Reporter {
     // @ts-ignore
     XMLHttpRequest.prototype.open = function (...args) {
       const [method, url] = args as Parameters<XMLHttpRequest['open']>;
-      const startTime = Math.floor(Date.now() / 1000);
+      const startTime = formatDate(new Date());
 
       this.reporterCollect = {
         ...this.reporterCollect,
@@ -247,7 +246,7 @@ export default class Reporter {
     };
     XMLHttpRequest.prototype.send = function (...args) {
       this.addEventListener('loadend', () => {
-        const endTime = Math.floor(Date.now() / 1000);
+        const endTime = formatDate(new Date());
         const { status, statusText } = this;
         if (status > 200 || !status) {
           this.reporterCollect = {

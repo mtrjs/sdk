@@ -46,9 +46,6 @@
     "web-vitals": "^3.3.1"
   },
   "types": "./dist/index.min.d.ts",
-  "directories": {
-    "example": "example"
-  },
   "publishConfig": {
     "access": "public"
   }

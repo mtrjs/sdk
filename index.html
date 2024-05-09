@@ -11,13 +11,22 @@
     <script src="./dist/index.js"></script>
     <script>
       const { default: Reporter } = window.monitor;
-      console.log(window.monitor);
       const reporter = new Reporter({
         appId: 'abc',
         env: 'test',
         dsn: 'http://127.0.0.1:3001/v1',
       });
       reporter.init();
+    </script>
+
+    <script>
+      setTimeout(() => {
+        aa;
+      }, 2000);
+
+      setTimeout(() => {
+        window.fetch('/aaa', {});
+      }, 2000);
     </script>
   </body>
 </html>

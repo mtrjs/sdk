@@ -58,7 +58,7 @@ export interface LData {
   // 事件 id
   eid: string;
   hash?: string;
-  t?: number;
+  t?: string;
   [k: string]: any;
 }
 
