@@ -18,17 +18,11 @@ export type Sender = (
 export interface ReporterConfig {
   // 应用 ID
   appId: string;
-  // 上报环境
-  env: string;
   // 上报服务端地址
   dsn: string;
   // 上报任务缓存数量, default: 20
   maxTasks?: number;
-  // 作品 ID
-  contentId?: string;
   // 作品名称
-  contentName?: string;
-
   // 用户ID
   userId?: string;
   // 用户昵称
@@ -43,13 +37,9 @@ export interface ReporterConfig {
 export interface IBaseData {
   // 应用 id
   appId: string;
-  appEnv: string;
-  cid?: string;
-  cname?: string;
   traceId: string;
   ua?: string;
   href?: string;
-
   uid?: string;
   uname?: string;
 }

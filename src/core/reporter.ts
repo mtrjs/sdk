@@ -51,11 +51,6 @@ function assertConfig(config: ReporterConfig) {
     return false;
   }
 
-  if (!config.env) {
-    console.info('缺少 应用环境');
-    return false;
-  }
-
   return true;
 }
 
@@ -93,7 +88,7 @@ export default class Reporter {
       console.log('无配置信息，初始化失败');
       return false;
     }
-    const { appId, env, userId, maxTasks = defaultMaxTasks } = this.config;
+    const { appId, userId, maxTasks = defaultMaxTasks } = this.config;
 
     this.config.dsn = this.config.dsn;
 
@@ -105,7 +100,6 @@ export default class Reporter {
 
     this.baseData = {
       appId,
-      appEnv: env,
       traceId,
       uid: userId,
       ua: navigator.userAgent,
@@ -489,6 +483,7 @@ export default class Reporter {
         loadEventEnd,
         loadEventStart,
         responseEnd,
+        responseStart,
         entryType,
         initiatorType,
         domContentLoadedEventEnd,
